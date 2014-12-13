@@ -1367,26 +1367,32 @@ static int nandwp_enable(int enable)
 }
 #define BLK_SIZE (2048 * 64)
 static struct mtd_partition ea3250_nand_partition[] = {
+#if 1
 	{
-		.name = "ea3250-boot",
-		.offset = 0,
-		.size = (BLK_SIZE * 4),
-		.mask_flags = MTD_WRITEABLE,
+		.name	= "smartarm3250-boot",
+		.offset	= 0,
+		.size	= (BLK_SIZE * 12)
 	},
 	{
-		.name = "ea3250-uboot",
-		.offset = MTDPART_OFS_APPEND,
-		.size = (BLK_SIZE * 6)
+		.name	= "smartarm3250-ubt-prms",
+		.offset	= (BLK_SIZE * 12),
+		.size	= (BLK_SIZE * 2)
 	},
 	{
-		.name = "ea3250-kernel",
-		.offset = MTDPART_OFS_APPEND,
-		.size = (BLK_SIZE * 32)
+		.name	= "smartarm3250-kernel",
+		.offset	= (BLK_SIZE * 16),
+		.size	= (BLK_SIZE * 32)
 	},
-	{
-		.name = "ea3250-jffs2",
-		.offset = MTDPART_OFS_APPEND,
-		.size = MTDPART_SIZ_FULL
+#endif
+    {
+		.name	= "smartarm3250-safefs",
+		.offset	= (BLK_SIZE * 48),
+		.size	= (BLK_SIZE * 128) //SZ_16M
+    },
+    {
+		.name	= "smartarm3250-rootfs",
+		.offset	= (BLK_SIZE * 176),//48),
+		.size	= MTDPART_SIZ_FULL
 	},
 };
 static struct mtd_partition * ea3250_nand_partitions(int size, int *num_partitions)
