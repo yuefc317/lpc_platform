@@ -337,6 +337,7 @@ static struct ads7846_platform_data ea_ads7846_platform_data __initdata = {
 /* LCDC chip select function */
 static void ea3250_spi_lcdc_cs_set(u32 control)
 {
+        control = 0;
 	gpio_set_value(LCD_CS_GPIO, (int) control);
 }
 

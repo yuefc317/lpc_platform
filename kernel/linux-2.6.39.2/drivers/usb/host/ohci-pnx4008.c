@@ -159,6 +159,11 @@ static u16 i2c_read16(u8 subaddr)
 	return data;
 }
 
+#define GPIO_BASE	          0x40028000
+#define OUTP_STATE_GPO(pin)	  _BIT((pin))
+#define GPIO_P3_OUTP_CLR(x)	  (x + 0x008)
+#define GPIO_IOBASE               io_p2v(GPIO_BASE)
+
 static void isp1301_configure(void)
 {
 #if !defined(CONFIG_ARCH_LPC32XX)
@@ -212,6 +217,11 @@ static void isp1301_configure(void)
 
 	/* Enable usb_need_clk clock after transceiver is initialized */
 	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
+
+        /* yuefc: hack for running on smartarm3250 board, external charge-pump is controled via gpo */
+	/* Put the USB port in HOST mode */
+	__raw_writel(OUTP_STATE_GPO(4), GPIO_P3_OUTP_CLR(GPIO_IOBASE)); 
+	
 
 	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n", i2c_read16(0x00));
 	printk(KERN_INFO "ISP1301 Product ID : 0x%04x\n", i2c_read16(0x02));
