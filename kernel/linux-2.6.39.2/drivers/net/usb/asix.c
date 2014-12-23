@@ -1548,6 +1548,10 @@ static const struct usb_device_id	products [] = {
 	USB_DEVICE(0x0b95, 0x772a),
 	.driver_info = (unsigned long) &ax88772_info,
 }, {
+	// Cables-to-Go USB Ethernet Adapter
+	USB_DEVICE(0x0b95, 0x772b),
+	.driver_info = (unsigned long) &ax88772_info,
+}, {
 	// ABOCOM for pci
 	USB_DEVICE(0x14ea, 0xab11),
 	.driver_info = (unsigned long) &ax88178_info,
