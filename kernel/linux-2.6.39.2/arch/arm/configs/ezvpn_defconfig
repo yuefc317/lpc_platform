@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/arm 2.6.39.2 Kernel Configuration
-# Fri Dec 26 18:00:12 2014
+# Tue Jan  6 10:49:21 2015
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1039,7 +1039,7 @@ CONFIG_GPIO_SYSFS=y
 # CONFIG_HWMON is not set
 # CONFIG_THERMAL is not set
 CONFIG_WATCHDOG=y
-# CONFIG_WATCHDOG_NOWAYOUT is not set
+CONFIG_WATCHDOG_NOWAYOUT=y
 
 #
 # Watchdog Device Drivers
