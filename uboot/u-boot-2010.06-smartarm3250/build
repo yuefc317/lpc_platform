@@ -1,0 +1,5 @@
+#!/bin/sh
+#make ARCH=arm CROSS_COMPILE=/opt/nxp/gcc-4.3.2-glibc-2.7/bin/arm-vfp-linux-gnu- distclean
+make ARCH=arm CROSS_COMPILE=/opt/nxp/gcc-4.3.2-glibc-2.7/bin/arm-vfp-linux-gnu- smartarm3250_config
+make ARCH=arm CROSS_COMPILE=/opt/nxp/gcc-4.3.2-glibc-2.7/bin/arm-vfp-linux-gnu- 
+		
