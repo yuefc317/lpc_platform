@@ -367,6 +367,12 @@ static int __init ea3250_spi_devices_register(void)
 			.chip_select = 0,
 			.controller_data = &spi0_chip_info,
 		},
+		{
+			.modalias      = "ea3250_lcdc",
+			.max_speed_hz  = 10000000,
+			.chip_select   = 1,
+			.controller_data = &spi0_chip_info1,
+		},
 	};
 #else
 	struct spi_board_info info[] = {
@@ -1622,15 +1628,15 @@ void __init ea3250_board_init(void)
 			LPC32XX_CLKPWR_TEST_CLK_SEL);
 
 #if defined (CONFIG_LEDS_PCA9532) || defined (CONFIG_EEPROM_AT24) || defined (CONFIG_FB_ARMCLCD)
-	i2c_register_board_info(0, ea3250_i2c_board_info,
-			ARRAY_SIZE(ea3250_i2c_board_info));
+	/*i2c_register_board_info(0, ea3250_i2c_board_info,
+			ARRAY_SIZE(ea3250_i2c_board_info));*/
 #endif
 
 	/* Register the I2C driver for LCD */
-	init_ea_i2c_video();
+	/*init_ea_i2c_video(); */
 
 	/* Register SPI driver for LCD */
-	ea3250_spi_lcdc_drv_init();
+	/*ea3250_spi_lcdc_drv_init();*/
 }
 
 static int __init lpc32xx_display_uid(void)
