@@ -659,7 +659,7 @@ static void __lpc_handle_recv(struct net_device *ndev)
 	{
 		/* Get pointer to receive status */
 		prxstat = (struct rx_status_t *) pldat->rx_stat_v [rxconsidx];
-		len = (prxstat->statusinfo & 0x7FF) + 1;
+		len = (prxstat->statusinfo & 0x7FF) - 4 + 1; /* strip crc part, by yuefc */
 
 		/* Status error? */
 		ethst = prxstat->statusinfo;
