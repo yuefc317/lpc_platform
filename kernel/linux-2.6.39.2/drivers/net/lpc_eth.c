@@ -391,6 +391,7 @@ static void __lpc_net_shutdown(struct netdata_local *pldat)
  */
 static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 {
+#if 1
 	struct netdata_local *pldat = bus->priv;
 	unsigned long timeout = jiffies + msecs_to_jiffies(100);
 	int lps;
@@ -407,7 +408,29 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 
 	lps = (int) readl(LPC_ENET_MRDD(pldat->net_base));
 	writel(0, LPC_ENET_MCMD(pldat->net_base));
-
+	
+        /*printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, lps); */
+#else
+        /* bypass mdio operations, return fix values instead, our mac is connected to FPGA without phy */
+	switch(phy_id)
+	{
+	case 0:
+	     lps = 0x3000;
+	     break;
+	case 1:
+	     lps = 0x786d;
+	     break;
+	case 4:
+	     lps = 0x1e1;
+	     break;
+	case 5:
+	     lps = 0xcde1;
+	     break;
+	default:
+	     printk(KERN_DEBUG "lpc_mdio_read out of range: phy_id=0x%x phy_reg=0x%x\n", phy_id, phyreg);     
+	}
+#endif	
+	
 	return lps;
 }
 
