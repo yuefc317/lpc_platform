@@ -202,7 +202,7 @@
 #define CONFIG_BOOTP_GATEWAY
 #define CONFIG_BOOTP_DNS
 #define CONFIG_BOOTCOMMAND "run yboot"//"tftpboot;bootm"
-#define CONFIG_BOOTARGS "ubi.mtd=4 root=ubi0:rootfs console=ttyS0,115200 mem=64M rootfstype=ubifs rw"
+#define CONFIG_BOOTARGS "ubi.mtd=4 root=ubi0:rootfs console=ttyS0,115200 mem=32M rootfstype=ubifs rw"
 
 /*
  * Area and size for malloc
