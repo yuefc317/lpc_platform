@@ -391,11 +391,11 @@ static void __lpc_net_shutdown(struct netdata_local *pldat)
  */
 static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 {
-#if 1
 	struct netdata_local *pldat = bus->priv;
 	unsigned long timeout = jiffies + msecs_to_jiffies(100);
 	int lps;
 
+#if 0
 	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
 	writel(LPC_MCMD_READ, LPC_ENET_MCMD(pldat->net_base));
 
@@ -411,23 +411,48 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 	
         /*printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, lps); */
 #else
-        /* bypass mdio operations, return fix values instead, our mac is connected to FPGA without phy */
-	switch(phy_id)
+        if(phy_id == 0){
+		/* bypass mdio operations, return fix values instead, our mac is connected to FPGA without phy */
+		switch(phyreg)
+		{
+		case 0:
+		     lps = 0x3000;
+		     break;
+		case 1:
+		     lps = 0x786d;
+		     break;
+		case 4:
+		     lps = 0x1e1;
+		     break;
+		case 5:
+		     lps = 0xcde1;
+		     break;
+		default:
+		     printk(KERN_DEBUG "lpc_mdio_read out of range: phy_id=0x%x phy_reg=0x%x\n", phy_id, phyreg);     
+		}
+	}
+	else
 	{
-	case 0:
-	     lps = 0x3000;
-	     break;
-	case 1:
-	     lps = 0x786d;
-	     break;
-	case 4:
-	     lps = 0x1e1;
-	     break;
-	case 5:
-	     lps = 0xcde1;
-	     break;
-	default:
-	     printk(KERN_DEBUG "lpc_mdio_read out of range: phy_id=0x%x phy_reg=0x%x\n", phy_id, phyreg);     
+	if(phy_id < 0x10)
+	    return 0;
+	
+	phy_id -= 0x10;
+	    
+	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
+	writel(LPC_MCMD_READ, LPC_ENET_MCMD(pldat->net_base));
+
+	/* Wait for unbusy status */
+	while (readl(LPC_ENET_MIND(pldat->net_base)) & LPC_MIND_BUSY) {
+		if (time_after(jiffies,timeout))
+			return -EIO;
+		cpu_relax();
+	}
+
+	lps = (int) readl(LPC_ENET_MRDD(pldat->net_base));
+	writel(0, LPC_ENET_MCMD(pldat->net_base));
+	
+        /*printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, lps); */
+	    	
 	}
 #endif	
 	
@@ -440,6 +465,7 @@ static int lpc_mdio_write(struct mii_bus *bus, int phy_id, int phyreg,
 	struct netdata_local *pldat = bus->priv;
 	unsigned long timeout = jiffies + msecs_to_jiffies(100);
 
+#if 0
 	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
 	writel(phydata, LPC_ENET_MWTD(pldat->net_base));
 
@@ -449,6 +475,23 @@ static int lpc_mdio_write(struct mii_bus *bus, int phy_id, int phyreg,
 			return -EIO;
 		cpu_relax();
 	}
+#else
+	if(phy_id < 0x10)
+	    return 0;
+	
+	phy_id -= 0x10;
+	
+	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
+	writel(phydata, LPC_ENET_MWTD(pldat->net_base));
+
+	/* Wait for completion */
+	while (readl(LPC_ENET_MIND(pldat->net_base)) & LPC_MIND_BUSY) {
+		if (time_after(jiffies,timeout))
+			return -EIO;
+		cpu_relax();
+	}
+	        
+#endif	
 
 	return 0;
 }
