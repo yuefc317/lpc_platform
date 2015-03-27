@@ -141,9 +141,11 @@ void udelay(unsigned long usec)
 /*
  * Miscellaneous platform dependent initialisations
  */
-
 int board_init (void)
 {
+       /* we skip board init here, they have been initialized earlier, yuefc */
+        return 0;
+
 	/* Kill data cache */
 	dcache_kill();
 
@@ -154,6 +156,8 @@ int board_init (void)
 	   structure */
 	phy3250_get_board_info();
 #endif
+
+#if 0
     /* Abing */
     GPIO->p3_mux_clr = 1<<6;  //configure as GPO_6
     GPIO->p3_outp_set = 1<<6; //
@@ -162,7 +166,7 @@ int board_init (void)
     /* GPO_14 GPO only */
     GPIO->p3_outp_set = 1<<14; //set GPO_14, unptetect NAND  FLASH
     /* end Abing */
-
+#endif
     
 
 	/* arch number of Logic-Board - MACH_TYPE_LPC3XXX */
@@ -205,6 +209,7 @@ int dram_init (void)
 	unsigned long sz = phyhwdesc.dramcfg & PHYHW_DRAM_SIZE_MASK;
 
 	gd->bd->bi_dram[0].start = PHYS_SDRAM_1;
+	sz = PHYHW_DRAM_SIZE_32M;
 
 	if (sz == PHYHW_DRAM_SIZE_16M)
 	{
