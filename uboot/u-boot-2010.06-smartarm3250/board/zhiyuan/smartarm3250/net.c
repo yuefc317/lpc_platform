@@ -54,6 +54,7 @@ static int RMII_Write (unsigned long PhyReg, unsigned long Value)
 	unsigned long mst = 250;
 	int sts = 0;
 
+#if 0
 	// Write value at PHY address and register
 	ENETMAC->madr = (PHYDEF_PHYADDR << 8) | PhyReg;
 	ENETMAC->mwtd = Value;
@@ -72,7 +73,9 @@ static int RMII_Write (unsigned long PhyReg, unsigned long Value)
 			msDelay(1);
 		}
 	}
-
+#else
+        sts = 1;
+#endif
 	return sts;
 }
 
@@ -82,6 +85,7 @@ int RMII_Read(unsigned long PhyReg, unsigned long *data)
 	unsigned long mst = 250;
 	int sts = 0;
 
+#if 0
 	// Read value at PHY address and register
 	ENETMAC->madr = (PHYDEF_PHYADDR << 8) | PhyReg;
 	ENETMAC->mcmd = MCMD_READ;
@@ -103,7 +107,29 @@ int RMII_Read(unsigned long PhyReg, unsigned long *data)
 	}
 
 	ENETMAC->mcmd = 0;
-
+#else
+        /* bypass mdio operations as hw is connected to switch asic directly */
+        sts = 1;
+	
+	switch(PhyReg)
+	{
+	case 0:
+	    *data = 0x3000;
+	    break;
+	case 1:
+	    *data = 0x786d;
+	    break;
+	case 4:
+	    *data = 0x01e1;
+	    break;
+	case 5:
+	    *data = 0xcde1;
+	    break;
+	default:
+	    *data = 0;    
+	}
+	
+#endif
 	return sts;
 }
 
