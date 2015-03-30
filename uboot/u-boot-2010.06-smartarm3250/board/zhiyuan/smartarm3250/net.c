@@ -468,15 +468,20 @@ void eth_halt (void)
 int eth_init (bd_t * bd)
 {
 	int rc;
-/*
-	// Set MAC address from hardware
-	bd->bi_enetaddr[0] = phyhwdesc.mac[0];	bd->bi_enetaddr[1] = phyhwdesc.mac[1];	bd->bi_enetaddr[2] = phyhwdesc.mac[2];	bd->bi_enetaddr[3] = phyhwdesc.mac[3];	bd->bi_enetaddr[4] = phyhwdesc.mac[4];	bd->bi_enetaddr[5] = phyhwdesc.mac[5];
-	printf ("\tHW MAC address:  "
-		"%02X:%02X:%02X:%02X:%02X:%02X\n",
-		bd->bi_enetaddr[0], bd->bi_enetaddr[1],
-		bd->bi_enetaddr[2], bd->bi_enetaddr[3],
-		bd->bi_enetaddr[4], bd->bi_enetaddr[5] );
-*/
+
+        /* get mac address from environment variable */
+	if (!eth_getenv_enetaddr("ethaddr", phyhwdesc.mac))
+	{
+	   /* no valid mac address, use default one */
+	   phyhwdesc.mac[0] = 0x00;
+	   phyhwdesc.mac[0] = 0x11;
+	   phyhwdesc.mac[0] = 0x22;
+	   phyhwdesc.mac[0] = 0x33;
+	   phyhwdesc.mac[0] = 0x44;
+	   phyhwdesc.mac[0] = 0x55;
+	   
+	} 
+	
 	printf ("\tHW MAC address:  "
 		"%02X:%02X:%02X:%02X:%02X:%02X\n",
 		phyhwdesc.mac[0], phyhwdesc.mac[1],
