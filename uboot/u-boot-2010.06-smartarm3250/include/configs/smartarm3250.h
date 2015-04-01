@@ -161,6 +161,9 @@
 #define CONFIG_CMD_BDI
 #define CONFIG_CMDLINE_EDITING  1
 
+
+#define CONFIG_NET_RETRY_COUNT 1000
+
 /*
  * Default range for the memory tests
  */

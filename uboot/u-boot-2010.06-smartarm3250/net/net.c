@@ -104,6 +104,7 @@ DECLARE_GLOBAL_DATA_PTR;
 # define ARP_TIMEOUT		CONFIG_ARP_TIMEOUT
 #endif
 
+#define CONFIG_NET_RETRY_COUNT 1000
 
 #ifndef	CONFIG_NET_RETRY_COUNT
 # define ARP_TIMEOUT_COUNT	5	/* # of timeouts before giving up  */
@@ -765,7 +766,7 @@ static void PingStart(void)
 #if defined(CONFIG_NET_MULTI)
 	printf ("Using %s device\n", eth_get_name());
 #endif	/* CONFIG_NET_MULTI */
-	NetSetTimeout (10000UL, PingTimeout);
+	NetSetTimeout (0/*10000UL*/, PingTimeout);
 	NetSetHandler (PingHandler);
 
 	PingSend();

@@ -30,6 +30,9 @@
 #include <configs/smartarm3250.h>
 #include "smartarm3250_prv.h"
 
+#include "rtl8306e_types.h"
+#include "rtl8306e_asicdrv.h"
+
 static unsigned long g_dmabase;
 static unsigned long gdma_size;
 static TXRX_DESC_T *pTXDesc;
@@ -49,14 +52,14 @@ static void msDelay(unsigned long ms)
 }
 
 //------------------------------------------------------------------------------
-static int RMII_Write (unsigned long PhyReg, unsigned long Value)
+static int RMII_Write (unsigned long PhyAddr, unsigned long PhyReg, unsigned long Value)
 {
 	unsigned long mst = 250;
 	int sts = 0;
 
-#if 0
+#if 1
 	// Write value at PHY address and register
-	ENETMAC->madr = (PHYDEF_PHYADDR << 8) | PhyReg;
+	ENETMAC->madr = (/*PHYDEF_PHYADDR*/PhyAddr << 8) | PhyReg;
 	ENETMAC->mwtd = Value;
 
 	// Wait for unbusy status
@@ -73,6 +76,8 @@ static int RMII_Write (unsigned long PhyReg, unsigned long Value)
 			msDelay(1);
 		}
 	}
+/*printf("Phy Write: reg=0x%x, data=0x%x, status=%d.\n", PhyReg, Value, sts);	*/
+	
 #else
         sts = 1;
 #endif
@@ -80,14 +85,14 @@ static int RMII_Write (unsigned long PhyReg, unsigned long Value)
 }
 
 //------------------------------------------------------------------------------
-int RMII_Read(unsigned long PhyReg, unsigned long *data) 
+int RMII_Read(unsigned long PhyAddr, unsigned long PhyReg, unsigned long *data) 
 {
 	unsigned long mst = 250;
 	int sts = 0;
 
-#if 0
+#if 1
 	// Read value at PHY address and register
-	ENETMAC->madr = (PHYDEF_PHYADDR << 8) | PhyReg;
+	ENETMAC->madr = (/*PHYDEF_PHYADDR*/PhyAddr << 8) | PhyReg;
 	ENETMAC->mcmd = MCMD_READ;
 
 	// Wait for unbusy status
@@ -107,6 +112,7 @@ int RMII_Read(unsigned long PhyReg, unsigned long *data)
 	}
 
 	ENETMAC->mcmd = 0;
+/*printf("Phy Read: reg=0x%x, data=0x%x, status=%d.\n", PhyReg, *data, sts);	*/
 #else
         /* bypass mdio operations as hw is connected to switch asic directly */
         sts = 1;
@@ -133,6 +139,8 @@ int RMII_Read(unsigned long PhyReg, unsigned long *data)
 	return sts;
 }
 
+
+
 //------------------------------------------------------------------------------
 int HYPHYReset(void)
 {
@@ -140,7 +148,7 @@ int HYPHYReset(void)
 	unsigned long tmp1, mst;
 
 	// Reset the PHY and wait for reset to complete
-	goodacc = RMII_Write(PHY_REG_BMCR, PHY_BMCR_RESET_BIT);
+	goodacc = RMII_Write(6, PHY_REG_BMCR, PHY_BMCR_RESET_BIT);
 	if (goodacc == 0)
 	{
 		return 0;
@@ -149,7 +157,7 @@ int HYPHYReset(void)
 	goodacc = 0;
 	while (mst > 0)
 	{
-		RMII_Read(PHY_REG_BMCR, &tmp1);
+		RMII_Read(6, PHY_REG_BMCR, &tmp1);
 		if ((tmp1 & PHY_BMCR_RESET_BIT) == 0)
 		{
 			mst = 0;
@@ -161,8 +169,29 @@ int HYPHYReset(void)
 			msDelay(1);
 		}
 	}
-
+rtl8306e_mib_reset(RTL8306_PORT5);
 	return goodacc;
+}
+
+
+int print_counter()
+{
+    unsigned int counter=0;
+    
+    rtl8306e_mib_get(RTL8306_PORT5,RTL8306_MIB_CNT1, &counter);
+    printf("     Tx: %8u", counter);
+    
+    rtl8306e_mib_get(RTL8306_PORT5,RTL8306_MIB_CNT2, &counter);
+    printf("     Rx: %8u\n", counter);
+    
+    rtl8306e_mib_get(RTL8306_PORT5,RTL8306_MIB_CNT3, &counter);
+    printf("     Drop: %8u", counter);
+    
+    rtl8306e_mib_get(RTL8306_PORT5,RTL8306_MIB_CNT4, &counter);
+    printf("     Bad: %8u\n", counter);
+    
+    rtl8306e_mib_get(RTL8306_PORT5,RTL8306_MIB_CNT5, &counter);
+    printf("     Frag: %8u\n", counter);
 }
 
 //------------------------------------------------------------------------------
@@ -313,7 +342,7 @@ int HWInit(bd_t * bd)
 	}
 
 	// Enable rate auto-negotiation for the link
-	if (RMII_Write(PHY_REG_BMCR,
+	if (RMII_Write(6, PHY_REG_BMCR,
 		(PHY_BMCR_SPEED_BIT | PHY_BMCR_AUTON_BIT)) == 0)
 	{
 		return 0;
@@ -325,7 +354,7 @@ int HWInit(bd_t * bd)
 	btemp = 0;
 	while (mst > 0)
 	{
-		goodacc &= RMII_Read(PHY_REG_BMSR, &tmp1);
+		goodacc &= RMII_Read(6, PHY_REG_BMSR, &tmp1);
 		if ((tmp1 & PHY_BMSR_AUTON_COMPLETE) != 0)
 		{
 			mst = 0;
@@ -350,7 +379,7 @@ int HWInit(bd_t * bd)
 	btemp = 0;
 	while (mst > 0)
 	{
-		goodacc &= RMII_Read(PHY_REG_BMSR, &tmp1);
+		goodacc &= RMII_Read(6, PHY_REG_BMSR, &tmp1);
 		if ((tmp1 & PHY_BMSR_LINKUP_STATUS) != 0)
 		{
 			mst = 0;
@@ -541,12 +570,25 @@ int eth_rx (void)
 
 		// Frame received, get size of RX packet
 		length = (pRXStatus[idx].statusinfo & 0x7FF);
-
+//printf("rx a packet: length=0x%x, rsv_status=0x%x.\n", length, ENETMAC->rsv);
 		/* Pass the packet up to the protocol layer */
 		if (length > 0)
 		{
 		        memcpy((void *) NetRxPackets[0], (void *) pRXVBuffs [idx], length);
+			
+			/*printf("packet content:\n");
+			int i;
+			char *p=NetRxPackets[0];
+			for(i=0;i<length;i++)
+			{
+			    if(i && (i%16)==0)
+			        printf("\n");
+			    printf("%2x ", *p++);
+			}
+			printf("\n");*/
+			
 			NetReceive (NetRxPackets[0], (unsigned short) length);
+			
 		}
 
 		// Return DMA buffer
@@ -565,7 +607,7 @@ int eth_rx (void)
 int eth_send (volatile void *packet, int length)
 {
 	unsigned long idx, cidx, fb;
-
+//if(length<10) return 0;
 	// Determine number of free buffers and wait for a buffer if needed
 	fb = 0;
 	while (fb == 0)
@@ -602,7 +644,21 @@ int eth_send (volatile void *packet, int length)
 		idx = 0;
 	}
 	ENETMAC->txproduceindex = idx;
-
+/*printf("tx a packet: length=%d.\n", length);
+			printf("packet content:\n");
+			int i;
+			char *p=packet;
+			for(i=0;i<length;i++)
+			{
+			    if(i && (i%16)==0)
+			        printf("\n");
+			    printf("%2x ", *p++);
+			}
+			printf("\n");
+print_counter();*/			
 	return 0;
 }
 
+#include "mdcmdio.c"
+
+#include "rtl8306e_asicdrv.c"
