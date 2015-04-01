@@ -143,18 +143,16 @@ void udelay(unsigned long usec)
  */
 int board_init (void)
 {
-       /* we skip board init here, they have been initialized earlier, yuefc */
-        return 0;
 
 	/* Kill data cache */
-	dcache_kill();
+	/* dcache_kill(); */ 
 
 #ifdef CONFIG_SKIP_LOWLEVEL_INIT
 	/* Normally, the phy3250_get_board_info() function is called as part of the
 	   low level system initialization. For systems that don't do low level system
 	   init (S1L based), call this function here to get the board configuration
 	   structure */
-	phy3250_get_board_info();
+	/*phy3250_get_board_info(); */
 #endif
 
 #if 0
@@ -168,12 +166,13 @@ int board_init (void)
     /* end Abing */
 #endif
     
-
 	/* arch number of Logic-Board - MACH_TYPE_LPC3XXX */
 	gd->bd->bi_arch_number = MACH_TYPE_UBOOTSYS;
 
 	/* adress of boot parameters */
 	gd->bd->bi_boot_params = CONFIG_ENV_ADDR;
+
+        return 0;
 
 #ifdef CONFIG_CMD_NAND
 	/* Enable clocks to the SLC NAND controller */
