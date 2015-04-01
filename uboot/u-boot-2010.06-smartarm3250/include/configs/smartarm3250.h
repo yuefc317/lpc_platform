@@ -282,13 +282,13 @@
 			                    "bootm $(bootmaddr)\0"                                      \
 			                                                                                \
 			"safemode="         "setenv bootargs ubi.mtd=3 root=ubi0:safefs "               \
-                                "console=ttyS0,115200 mem=64M rootfstype=ubifs rw;"         \
+                                "console=ttyS0,115200 mem=32M rootfstype=ubifs rw;"         \
                                 "run yboot\0"                                               \
 			                                                                                \
 			"zhiyuan="          "run upsafefs; run upkernel; run set\0"                     \
                                                                                             \
             "set="              "setenv bootargs ubi.mtd=4 root=ubi0:rootfs rootfstype=ubifs "\
-                                "console=ttyS0,115200 mem=64M, monitor=$(monitor), $(opt); "\
+                                "console=ttyS0,115200 mem=32M, monitor=$(monitor) ethaddr=$(ethaddr); "\
                                 "saveenv\0"
 
 
