@@ -728,10 +728,25 @@ static void __lpc_handle_recv(struct net_device *ndev)
 		len = (prxstat->statusinfo & 0x7FF) - 4 + 1; /* strip crc part, by yuefc */
 
 		/* Status error? */
-		ethst = prxstat->statusinfo & 0x00800000;
+		ethst = prxstat->statusinfo;
+		if ((ethst & 0xBE800000) == 0x84000000)
+			ethst &= ~0x80000000;
 
-		if (ethst) {
-			ndev->stats.rx_crc_errors++;
+		if (ethst & 0x80000000) {
+			/* Check statuses */
+			if (prxstat->statusinfo & (1 << 28)) {
+				/* Overrun error */
+				ndev->stats.rx_fifo_errors++;
+			} else if (prxstat->statusinfo & (1 << 23)) {
+				/* CRC error */
+				ndev->stats.rx_crc_errors++;
+			} else if (prxstat->statusinfo & (1 << 25)) {
+				/* Length error */
+				ndev->stats.rx_length_errors++;
+			} else if (prxstat->statusinfo & 0x80000000) {
+				/* Other error */
+				ndev->stats.rx_length_errors++;
+			}
 			ndev->stats.rx_errors++;
 		} else {
 			/* Packet is good */
