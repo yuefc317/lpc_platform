@@ -728,7 +728,7 @@ static void __lpc_handle_recv(struct net_device *ndev)
 		len = (prxstat->statusinfo & 0x7FF) - 4 + 1; /* strip crc part, by yuefc */
 
 		/* Status error? */
-		ethst = prxstat->statusinfo & 0x00100000;
+		ethst = prxstat->statusinfo & 0x00800000;
 
 		if (ethst) {
 			ndev->stats.rx_crc_errors++;
