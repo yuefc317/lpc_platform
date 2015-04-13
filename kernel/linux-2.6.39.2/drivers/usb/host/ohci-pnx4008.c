@@ -105,6 +105,58 @@
 #define ISP1301_I2C_INTERRUPT_RISING 0xE
 #define ISP1301_I2C_REG_CLEAR_ADDR 1
 
+/* MIC2555 USB transceiver I2C registers */
+#define MIC2555_I2C_VENDOR_ID      0x00
+#define MIC2555_I2C_PRODUCT_ID     0x02
+#define MIC2555_I2C_CTRL_REG_01    0x04
+#  define  CTRL1_SPEED_FULL           (1 << 0)
+#  define  CTRL1_SUSPEND_EN           (1 << 1)
+#  define  CTRL1_DAT_SE0_MODE         (1 << 2)
+#  define  CTRL1_BDIS_ACON_EN         (1 << 4)
+#  define  CTRL1_OE_INT_OUTPUT_EN     (1 << 5)
+#  define  CTRL1_UART_EN              (1 << 6)
+#  define  CTRL1_UART_IO              (1 << 7)
+
+#define MIC2555_I2C_CTRL_REG_02    0x06
+#  define  CTRL2_DP_PULL_UP           (1 << 0)
+#  define  CTRL2_DM_PULL_UP           (1 << 1)
+#  define  CTRL2_DP_PULL_DOWN         (1 << 2)
+#  define  CTRL2_DM_PULL_DOWN         (1 << 3)
+#  define  CTRL2_ID_GRND_OUT          (1 << 4)
+#  define  CTRL2_VBUS_CHARG_PUMP_DRV  (1 << 5)
+#  define  CTRL2_VBUS_DISCHARG        (1 << 6)
+#  define  CTRL2_VBUS_CHARG           (1 << 7)
+
+#define MIC2555_I2C_CTRL_REG_03    0x12
+#  define  CTRL3_PWR_DOWN          (1 << 0)
+#  define  CTRL3_CHARG_PUMP_OFF    (1 << 1)
+#  define  CTRL3_ID_DET_OFF        (1 << 2)
+#  define  CTRL3_CAR_INT_SEL       (1 << 3)
+#  define  CTRL3_SESS_END_EN       (1 << 4)
+#  define  CTRL3_EXT_OSC           (1 << 5)
+#  define  CTRL3_RCS_DIS           (1 << 6)
+#  define  CTRL3_SCL_BI_EN         (1 << 7)
+
+#define MIC2555_I2C_INT_SOURCE           0x08
+#define MIC2555_I2C_INT_LATCH            0x0A
+#define MIC2555_I2C_INT_MASK_FALSE       0x0C
+#define MIC2555_I2C_INT_MASK_TRUE        0x0E
+
+#define MIC2555_I2C_GPIO_OUT_EN          0x14
+#define MIC2555_I2C_GPIO_OUT_VAL         0x16
+#define MIC2555_I2C_GPIO_INPUT_VAL       0x18
+#define MIC2555_I2C_GPIO_INT_LATCH       0x1A
+#define MIC2555_I2C_GPIO_INT_MASK_FALSE  0x1C
+#define MIC2555_I2C_GPIO_INT_MASK_TRUE   0x1E
+#  define  REG_GPIO_0              (1 << 0)
+#  define  REG_GPIO_1              (1 << 1)
+#  define  REG_GPIO_2              (1 << 2)
+
+#define MIC2555_I2C_REG_CLEAR_ADDR 1
+
+#define MIC2555_I2C_ADDR           0x2C
+
+
 static struct i2c_driver isp1301_driver;
 static struct i2c_client *isp1301_i2c_client;
 
@@ -114,7 +166,7 @@ extern int ocpi_enable(void);
 static struct clk *usb_clk;
 
 static const unsigned short normal_i2c[] =
-    { ISP1301_I2C_ADDR, ISP1301_I2C_ADDR + 1, I2C_CLIENT_END };
+    { MIC2555_I2C_ADDR, MIC2555_I2C_ADDR + 1, I2C_CLIENT_END };
 
 static int isp1301_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
@@ -159,10 +211,6 @@ static u16 i2c_read16(u8 subaddr)
 	return data;
 }
 
-#define GPIO_BASE	          0x40028000
-#define OUTP_STATE_GPO(pin)	  _BIT((pin))
-#define GPIO_P3_OUTP_CLR(x)	  (x + 0x008)
-#define GPIO_IOBASE               io_p2v(GPIO_BASE)
 
 static void isp1301_configure(void)
 {
@@ -191,54 +239,41 @@ static void isp1301_configure(void)
 #else
 	/* LPC32XX only supports DAT_SE0 USB mode */
 	/* This sequence is important */
-
-	/* Disable transparent UART mode first */
-	i2c_write(MC1_UART_EN, (ISP1301_I2C_MODE_CONTROL_1 |
-				ISP1301_I2C_REG_CLEAR_ADDR));
-
-	i2c_write(~MC1_SPEED_REG, (ISP1301_I2C_MODE_CONTROL_1 |
-				ISP1301_I2C_REG_CLEAR_ADDR));
-	i2c_write(MC1_SPEED_REG, ISP1301_I2C_MODE_CONTROL_1);
-	i2c_write(~0, (ISP1301_I2C_MODE_CONTROL_2 | ISP1301_I2C_REG_CLEAR_ADDR));
-	i2c_write((MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL),
-			ISP1301_I2C_MODE_CONTROL_2);
-	i2c_write(~0, (ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
-	i2c_write(MC1_DAT_SE0, ISP1301_I2C_MODE_CONTROL_1);
-	i2c_write((OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN),
-			ISP1301_I2C_OTG_CONTROL_1);
-	i2c_write((OTG1_DM_PULLUP | OTG1_DP_PULLUP),
-			(ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
-	i2c_write(~0,
-			ISP1301_I2C_INTERRUPT_LATCH | ISP1301_I2C_REG_CLEAR_ADDR);
-	i2c_write(~0,
-			ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
-	i2c_write(~0,
-			ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
-
+			
+	/* Disable UART mode, enable DAT_SE0/Full Speed/Full Power USB mode */		
+	i2c_write(~0, (MIC2555_I2C_CTRL_REG_01 | MIC2555_I2C_REG_CLEAR_ADDR));
+	i2c_write(CTRL1_DAT_SE0_MODE | CTRL1_SPEED_FULL, MIC2555_I2C_CTRL_REG_01);
+	
+    /* USB host mode: DP/DM pull down, ID pin to ground, drive VBUS through charge pump */
+	i2c_write(~0, (MIC2555_I2C_CTRL_REG_02 | MIC2555_I2C_REG_CLEAR_ADDR));
+	i2c_write(CTRL2_DP_PULL_DOWN | CTRL2_DM_PULL_DOWN | CTRL2_ID_GRND_OUT | 
+	          CTRL2_VBUS_CHARG_PUMP_DRV, MIC2555_I2C_CTRL_REG_02);
+    
+	i2c_write(~0, (MIC2555_I2C_CTRL_REG_03 | MIC2555_I2C_REG_CLEAR_ADDR));
+	i2c_write(~0, (MIC2555_I2C_INT_LATCH | MIC2555_I2C_REG_CLEAR_ADDR));
+	i2c_write(~0, (MIC2555_I2C_INT_MASK_FALSE | MIC2555_I2C_REG_CLEAR_ADDR));
+	i2c_write(~0, (MIC2555_I2C_INT_MASK_TRUE | MIC2555_I2C_REG_CLEAR_ADDR));
+	
+			
 	/* Enable usb_need_clk clock after transceiver is initialized */
 	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
-
-        /* yuefc: hack for running on smartarm3250 board, external charge-pump is controled via gpo */
-	/* Put the USB port in HOST mode */
-	__raw_writel(OUTP_STATE_GPO(4), GPIO_P3_OUTP_CLR(GPIO_IOBASE)); 
 	
 
-	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n", i2c_read16(0x00));
-	printk(KERN_INFO "ISP1301 Product ID : 0x%04x\n", i2c_read16(0x02));
-	printk(KERN_INFO "ISP1301 Version ID : 0x%04x\n", i2c_read16(0x14));
+	printk(KERN_INFO "MIC2555 Vendor ID  : 0x%04x\n", i2c_read16(MIC2555_I2C_VENDOR_ID));
+	printk(KERN_INFO "MIC2555 Product ID : 0x%04x\n", i2c_read16(MIC2555_I2C_PRODUCT_ID));
 #endif
 
 }
 
 static inline void isp1301_vbus_on(void)
 {
-	i2c_write(OTG1_VBUS_DRV, ISP1301_I2C_OTG_CONTROL_1);
+	/*i2c_write(OTG1_VBUS_DRV, ISP1301_I2C_OTG_CONTROL_1);*/
 }
 
 static inline void isp1301_vbus_off(void)
 {
-	i2c_write(OTG1_VBUS_DRV,
-		  ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
+	/*i2c_write(OTG1_VBUS_DRV,
+		  ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);*/
 }
 
 static void pnx4008_start_hc(void)
