@@ -426,7 +426,7 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 	lps = (int) readl(LPC_ENET_MRDD(pldat->net_base));
 	writel(0, LPC_ENET_MCMD(pldat->net_base));
 	
-        printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, lps);
+        /*printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, lps);*/
 
 	
 	return lps;
@@ -450,7 +450,7 @@ static int lpc_mdio_write(struct mii_bus *bus, int phy_id, int phyreg,
 		cpu_relax();
 	}
 	
-        printk(KERN_DEBUG "lpc_mdio_write: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, phydata);
+        /*printk(KERN_DEBUG "lpc_mdio_write: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, phydata);*/
 
 	return 0;
 }
