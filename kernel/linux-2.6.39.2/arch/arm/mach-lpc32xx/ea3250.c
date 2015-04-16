@@ -291,18 +291,39 @@ static struct amba_device lpc32xx_ssp0_device = {
 	.irq				= {IRQ_LPC32XX_SSP0, NO_IRQ},
 };
 
+static struct pl022_ssp_controller lpc32xx_ssp1_data = {
+	.bus_id			= 1,
+	.num_chipselect		= 2,
+	.enable_dma		= 0,
+};
+
+static struct amba_device lpc32xx_ssp1_device = {
+	.dev	= {
+		.coherent_dma_mask	= ~0,
+		.init_name		= "dev:ssp1",
+		.platform_data		= &lpc32xx_ssp1_data,
+	},
+	.res				= {
+		.start			= LPC32XX_SSP1_BASE,
+		.end			= (LPC32XX_SSP1_BASE + SZ_4K - 1),
+		.flags			= IORESOURCE_MEM,
+	},
+	.dma_mask			= ~0,
+	.irq				= {IRQ_LPC32XX_SSP1, NO_IRQ},
+};
+
 /*
  * Touchscreen device
  */
 /* Touch screen chip select function */
 static void ea3250_spi_cs_set(u32 control)
 {
-	gpio_set_value(SPI0_CS_GPIO, (int) control);
+	/*gpio_set_value(SPI0_CS_GPIO, (int) control);*/
 }
 
 /* Touch screen SPI parameters */
 static struct pl022_config_chip spi0_chip_info = {
-	.com_mode		= INTERRUPT_TRANSFER,
+	.com_mode		= POLLING_TRANSFER,
 	.iface			= SSP_INTERFACE_MOTOROLA_SPI,
 	.hierarchy		= SSP_MASTER,
 	.slave_tx_disable	= 0,
@@ -363,16 +384,16 @@ static int __init ea3250_spi_devices_register(void)
 		{
 			.modalias = "spidev",
 			.max_speed_hz = 2500000,
-			.bus_num = 0,
+			.bus_num = 1,
 			.chip_select = 0,
 			.controller_data = &spi0_chip_info,
 		},
-		{
+		/*{
 			.modalias      = "ea3250_lcdc",
 			.max_speed_hz  = 10000000,
 			.chip_select   = 1,
 			.controller_data = &spi0_chip_info1,
-		},
+		},*/
 	};
 #else
 	struct spi_board_info info[] = {
@@ -1332,8 +1353,9 @@ struct amba_device lpc32xx_mmc_device = {
 /* AMBA based devices list */
 static struct amba_device *amba_devs[] __initdata = {
 	&lpc32xx_ssp0_device,
+	&lpc32xx_ssp1_device,
 #if defined (CONFIG_FB_ARMCLCD)
-	&lpc32xx_clcd_device,
+	/*&lpc32xx_clcd_device,*/
 #endif
 #if defined (CONFIG_MMC_ARMMMCI)
 	&lpc32xx_mmc_device,
@@ -1349,6 +1371,16 @@ static int __init ea3250_amba_devices_register(void)
 {
 	u32 i = 0;
 
+	/* setup MUX register to use SSP0 */
+	__raw_writel(( _BIT(12) | _BIT(10) | _BIT(9) ), LPC32XX_GPIO_P_MUX_SET);
+
+	/* setup MUX register to use SSP1 */
+	__raw_writel(( _BIT(8) | _BIT(6) | _BIT(5) ), LPC32XX_GPIO_P_MUX_SET);
+
+	/* setup MUX register to use SSEL1 */
+	__raw_writel(_BIT(4), LPC32XX_GPIO_P2_MUX_SET);
+
+	
 	/* Add AMBA devices */
 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
 		struct amba_device *d = amba_devs[i];
@@ -1569,11 +1601,11 @@ void __init ea3250_board_init(void)
 			LPC32XX_CLKPWR_NAND_CLK_CTRL);
 
 	/* Setup LCD muxing to RGB565 */
-	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL) &
+	/*tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL) &
 		~(LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_MSK |
 				LPC32XX_CLKPWR_LCDCTRL_PSCALE_MSK);
 	tmp |= LPC32XX_CLKPWR_LCDCTRL_LCDTYPE_TFT16;
-	__raw_writel(tmp, LPC32XX_CLKPWR_LCDCLK_CTRL);
+	__raw_writel(tmp, LPC32XX_CLKPWR_LCDCLK_CTRL); */
 
 	/* Set up I2C pull levels */
 	tmp = __raw_readl(LPC32XX_CLKPWR_I2C_CLK_CTRL);
@@ -1597,13 +1629,13 @@ void __init ea3250_board_init(void)
 	 */
 	/* Initialise SSP clock */
 	tmp = __raw_readl(LPC32XX_CLKPWR_SSP_CLK_CTRL);
-	__raw_writel((tmp | LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN),
+	__raw_writel((tmp | LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN | LPC32XX_CLKPWR_SSPCTRL_SSPCLK1_EN),
 			LPC32XX_CLKPWR_SSP_CLK_CTRL);
 
 	/* Initialise LCD clock */
-	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL);
+	/*tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL);
 	__raw_writel((tmp | LPC32XX_CLKPWR_LCDCTRL_CLK_EN),
-			LPC32XX_CLKPWR_LCDCLK_CTRL);
+			LPC32XX_CLKPWR_LCDCLK_CTRL); */
 
 	/* Enable SD card clock so AMBA driver will work correctly. The
 	   AMBA driver needs the clock before the SD card controller
