@@ -391,10 +391,10 @@ static void __lpc_net_shutdown(struct netdata_local *pldat)
  */
 static int phy_id_map_for_ezvpn(int phy_id)
 {
-    if(phy_id < 6)
+    if(phy_id<=6)
     {
         if(phy_id == 0)
-	    phy_id = 5;
+	    phy_id = 6;
 	else
 	    phy_id -= 1;    
     }
@@ -412,6 +412,8 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 	int lps;
 
         phy_id = phy_id_map_for_ezvpn(phy_id);
+      
+       /* printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x\n", phy_id, phyreg);*/
 	
 	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
 	writel(LPC_MCMD_READ, LPC_ENET_MCMD(pldat->net_base));
