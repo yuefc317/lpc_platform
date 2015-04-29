@@ -239,17 +239,17 @@ static void isp1301_configure(void)
 #else
 	/* LPC32XX only supports DAT_SE0 USB mode */
 	/* This sequence is important */
-			
+	int i;		
 	/* Disable UART mode, enable DAT_SE0/Full Speed/Full Power USB mode */		
 	i2c_write(~0, (MIC2555_I2C_CTRL_REG_01 | MIC2555_I2C_REG_CLEAR_ADDR));
 	i2c_write(CTRL1_DAT_SE0_MODE | CTRL1_SPEED_FULL, MIC2555_I2C_CTRL_REG_01);
 	
-    /* USB host mode: DP/DM pull down, ID pin to ground, drive VBUS through charge pump */
+        /* USB host mode: no DP/DM pull down, no ID pin to ground, no drive VBUS through charge pump */
 	i2c_write(~0, (MIC2555_I2C_CTRL_REG_02 | MIC2555_I2C_REG_CLEAR_ADDR));
-	i2c_write(CTRL2_DP_PULL_DOWN | CTRL2_DM_PULL_DOWN | CTRL2_ID_GRND_OUT | 
-	          CTRL2_VBUS_CHARG_PUMP_DRV, MIC2555_I2C_CTRL_REG_02);
     
 	i2c_write(~0, (MIC2555_I2C_CTRL_REG_03 | MIC2555_I2C_REG_CLEAR_ADDR));
+	i2c_write(CTRL3_CHARG_PUMP_OFF, MIC2555_I2C_CTRL_REG_03);
+	
 	i2c_write(~0, (MIC2555_I2C_INT_LATCH | MIC2555_I2C_REG_CLEAR_ADDR));
 	i2c_write(~0, (MIC2555_I2C_INT_MASK_FALSE | MIC2555_I2C_REG_CLEAR_ADDR));
 	i2c_write(~0, (MIC2555_I2C_INT_MASK_TRUE | MIC2555_I2C_REG_CLEAR_ADDR));
@@ -261,6 +261,7 @@ static void isp1301_configure(void)
 
 	printk(KERN_INFO "MIC2555 Vendor ID  : 0x%04x\n", i2c_read16(MIC2555_I2C_VENDOR_ID));
 	printk(KERN_INFO "MIC2555 Product ID : 0x%04x\n", i2c_read16(MIC2555_I2C_PRODUCT_ID));
+	
 #endif
 
 }
