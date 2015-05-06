@@ -386,7 +386,7 @@ static void __lpc_net_shutdown(struct netdata_local *pldat)
 	writel(0, LPC_ENET_MAC2(pldat->net_base));
 }
 
-/* LPC3250's RMII is connected to a 6-port switch, the port number CPU connected is 6
+/* LPC3250's RMII is connected to a 6-port switch, the port number CPU connected is 5
    PHY ID is mapped by this function
  */
 static int phy_id_map_for_ezvpn(int phy_id)
@@ -394,7 +394,7 @@ static int phy_id_map_for_ezvpn(int phy_id)
     if(phy_id<=6)
     {
         if(phy_id == 0)
-	    phy_id = 6;
+	    phy_id = 4;
 	else
 	    phy_id -= 1;    
     }
