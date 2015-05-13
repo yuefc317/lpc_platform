@@ -692,8 +692,13 @@ static void __lpc_handle_recv(struct net_device *ndev)
 		ethst = prxstat->statusinfo;
 		if ((ethst & 0xBE800000) == 0x84000000)
 			ethst &= ~0x80000000;
+			
+		if ((ethst & 0xBF800000) == 0x81000000)
+			ethst &= ~0x80000000;
 
 		if (ethst & 0x80000000) {
+		        printk(KERN_DEBUG "lpc_rx_err: status=0x%x\n", ethst);
+
 			/* Check statuses */
 			if (prxstat->statusinfo & (1 << 28)) {
 				/* Overrun error */
