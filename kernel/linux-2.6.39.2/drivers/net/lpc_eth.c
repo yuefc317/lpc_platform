@@ -331,11 +331,13 @@ static void __lpc_eth_init(struct netdata_local *pldat)
 	writel(tmp, LPC_ENET_MAC1(pldat->net_base));
 
 	/* Initial MAC setup */
-	writel(LPC_MAC1_PASS_ALL_RX_FRAMES, LPC_ENET_MAC1(pldat->net_base));
+	writel((LPC_MAC1_PASS_ALL_RX_FRAMES | LPC_MAC1_TX_FLOW_CONTROL), LPC_ENET_MAC1(pldat->net_base));
 	writel((LPC_MAC2_PAD_CRC_ENABLE | LPC_MAC2_CRC_ENABLE),
 		LPC_ENET_MAC2(pldat->net_base));
 	writel(ENET_MAXF_SIZE, LPC_ENET_MAXF(pldat->net_base));
 
+	writel(0xFFFF, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
+         
 	/* Collision window, gap */
 	writel((LPC_CLRT_LOAD_RETRY_MAX(0xF) |
 		LPC_CLRT_LOAD_COLLISION_WINDOW(0x37)),
@@ -672,6 +674,41 @@ static void __lpc_handle_xmit(struct net_device *ndev)
 		netif_wake_queue(ndev);
 }
 
+static int check_need_pause(struct netdata_local *pldat)
+{
+	int rxconsidx, rxprodidx, num;
+	
+	/* num is packets in buffer need to process */
+	
+	rxconsidx = (int) readl(LPC_ENET_RXCONSUMEINDEX(pldat->net_base));
+	rxprodidx = (int) readl(LPC_ENET_RXPRODUCEINDEX(pldat->net_base));
+	
+	if(rxprodidx >= rxconsidx)
+	    num = rxprodidx - rxconsidx;
+	else
+	    num = ENET_RX_DESC - (rxconsidx - rxprodidx);   
+	
+	return (num >= (ENET_RX_DESC*2/3));  
+}
+
+static void start_pause_frame(struct netdata_local *pldat)
+{
+	u32 tmp;
+
+	tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
+	tmp |= LPC_COMMAND_TXFLOWCONTROL;
+	writel(tmp, LPC_ENET_COMMAND(pldat->net_base));
+}
+
+static void stop_pause_frame(struct netdata_local *pldat)
+{
+	u32 tmp;
+
+	tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
+	tmp &= ~LPC_COMMAND_TXFLOWCONTROL;
+	writel(tmp, LPC_ENET_COMMAND(pldat->net_base));
+}
+
 static void __lpc_handle_recv(struct net_device *ndev)
 {
 	struct netdata_local *pldat = netdev_priv(ndev);
@@ -680,6 +717,11 @@ static void __lpc_handle_recv(struct net_device *ndev)
 	struct rx_status_t *prxstat;
 	u8 *prdbuf;
 
+        if(check_need_pause(pldat))
+	{
+	    start_pause_frame(pldat);
+	}
+	
 	/* Get the current RX buffer indexes */
 	rxconsidx = (int) readl(LPC_ENET_RXCONSUMEINDEX(pldat->net_base));
 	while (rxconsidx != (int) readl(LPC_ENET_RXPRODUCEINDEX(pldat->net_base)))
@@ -741,6 +783,8 @@ static void __lpc_handle_recv(struct net_device *ndev)
 			rxconsidx = 0;
 		writel((u32) rxconsidx, LPC_ENET_RXCONSUMEINDEX(pldat->net_base));
 	}
+	
+	stop_pause_frame(pldat);
 }
 
 static irqreturn_t __lpc_eth_interrupt(int irq, void *dev_id)
