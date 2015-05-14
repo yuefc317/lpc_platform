@@ -359,10 +359,13 @@ static void tun_free_netdev(struct net_device *dev)
 	sock_put(tun->socket.sk);
 }
 
+static int pause_needed=0;
+
 /* Net device open. */
 static int tun_net_open(struct net_device *dev)
 {
 	netif_start_queue(dev);
+	pause_needed=0;
 	return 0;
 }
 
@@ -370,7 +373,14 @@ static int tun_net_open(struct net_device *dev)
 static int tun_net_close(struct net_device *dev)
 {
 	netif_stop_queue(dev);
+	pause_needed=0;
 	return 0;
+}
+
+
+int ezvpn_eth_need_pause()
+{
+    return pause_needed;
 }
 
 /* Net device start xmit */
@@ -393,7 +403,16 @@ static netdev_tx_t tun_net_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (tun->socket.sk->sk_filter &&
 	    sk_filter(tun->socket.sk, skb))
 		goto drop;
-
+		
+	if (skb_queue_len(&tun->socket.sk->sk_receive_queue) >= (dev->tx_queue_len/2)) 
+        {
+	    pause_needed = 1;
+        }
+	else
+	{
+	    pause_needed = 0;
+	}
+	
 	if (skb_queue_len(&tun->socket.sk->sk_receive_queue) >= dev->tx_queue_len) {
 		if (!(tun->flags & TUN_ONE_QUEUE)) {
 			/* Normal queueing mode. */

@@ -336,7 +336,7 @@ static void __lpc_eth_init(struct netdata_local *pldat)
 		LPC_ENET_MAC2(pldat->net_base));
 	writel(ENET_MAXF_SIZE, LPC_ENET_MAXF(pldat->net_base));
 
-	writel(0xFFFF, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
+	writel(0xFFFF00FF, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
          
 	/* Collision window, gap */
 	writel((LPC_CLRT_LOAD_RETRY_MAX(0xF) |
@@ -674,6 +674,8 @@ static void __lpc_handle_xmit(struct net_device *ndev)
 		netif_wake_queue(ndev);
 }
 
+extern int ezvpn_eth_need_pause();
+
 static int check_need_pause(struct netdata_local *pldat)
 {
 	int rxconsidx, rxprodidx, num;
@@ -717,9 +719,15 @@ static void __lpc_handle_recv(struct net_device *ndev)
 	struct rx_status_t *prxstat;
 	u8 *prdbuf;
 
-        if(check_need_pause(pldat))
+        if(ezvpn_eth_need_pause())
 	{
 	    start_pause_frame(pldat);
+	    printk(KERN_DEBUG "lpc_rx_pause: start\n");
+	}
+	else
+	{
+	    stop_pause_frame(pldat);
+	    printk(KERN_DEBUG "lpc_rx_pause: stop\n");
 	}
 	
 	/* Get the current RX buffer indexes */
@@ -783,8 +791,6 @@ static void __lpc_handle_recv(struct net_device *ndev)
 			rxconsidx = 0;
 		writel((u32) rxconsidx, LPC_ENET_RXCONSUMEINDEX(pldat->net_base));
 	}
-	
-	stop_pause_frame(pldat);
 }
 
 static irqreturn_t __lpc_eth_interrupt(int irq, void *dev_id)
