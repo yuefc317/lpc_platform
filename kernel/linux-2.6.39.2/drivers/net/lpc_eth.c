@@ -447,6 +447,17 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 			return -EIO;
 		cpu_relax();
 	}
+	
+        phy_id = 4;  phyreg=4; phydata=0x5e1;
+	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
+	writel(phydata, LPC_ENET_MWTD(pldat->net_base));
+
+	/* Wait for completion */
+	while (readl(LPC_ENET_MIND(pldat->net_base)) & LPC_MIND_BUSY) {
+		if (time_after(jiffies,timeout))
+			return -EIO;
+		cpu_relax();
+	}
 #endif	
 #if 0	
         phy_id = 5;  phyreg=0; phydata=0x2100;
@@ -725,7 +736,7 @@ static void start_pause_frame(struct netdata_local *pldat)
 {
 	u32 tmp;
 
-	writel(0x0FFF0FFF, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
+	writel(0xFFFF0000, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
 
 	tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
 	tmp |= LPC_COMMAND_TXFLOWCONTROL;
@@ -757,7 +768,7 @@ static void __lpc_handle_recv(struct net_device *ndev)
 	    start_pause_frame(pldat);
 	    printk(KERN_DEBUG "lpc_rx_pause: start, status=0x%x\n", readl(LPC_ENET_FLOWCONTROLSTATUS(pldat->net_base)));
 	}
-	else if(!ezvpn_eth_need_pause())
+	else if((tmp&LPC_COMMAND_TXFLOWCONTROL) && !ezvpn_eth_need_pause())
 	{
 	    printk(KERN_DEBUG "lpc_rx_pause: stop, status=0x%x\n", readl(LPC_ENET_FLOWCONTROLSTATUS(pldat->net_base)));
 	    stop_pause_frame(pldat);
