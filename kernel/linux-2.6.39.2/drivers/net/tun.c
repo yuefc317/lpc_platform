@@ -404,11 +404,11 @@ static netdev_tx_t tun_net_xmit(struct sk_buff *skb, struct net_device *dev)
 	    sk_filter(tun->socket.sk, skb))
 		goto drop;
 		
-	if (skb_queue_len(&tun->socket.sk->sk_receive_queue) >= (dev->tx_queue_len*2/3)) 
+	if (skb_queue_len(&tun->socket.sk->sk_receive_queue) >= (dev->tx_queue_len/2)) 
         {
 	    pause_needed = 1;
         }
-	else if(skb_queue_len(&tun->socket.sk->sk_receive_queue) <= (dev->tx_queue_len/2))
+	else if(skb_queue_len(&tun->socket.sk->sk_receive_queue) <= (dev->tx_queue_len/3))
 	{
 	    pause_needed = 0;
 	}

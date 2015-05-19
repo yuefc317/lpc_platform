@@ -415,7 +415,6 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 	struct netdata_local *pldat = bus->priv;
 	unsigned long timeout = jiffies + msecs_to_jiffies(100);
 	int lps;
-	u16 phydata;
 
         phy_id = phy_id_map_for_ezvpn(phy_id);
       
@@ -434,43 +433,8 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 	lps = (int) readl(LPC_ENET_MRDD(pldat->net_base));
 	writel(0, LPC_ENET_MCMD(pldat->net_base));
 	
-        printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, lps);
+        /*printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, lps);*/
 
-#if 1	
-        phy_id = 5;  phyreg=4; phydata=0x5e1;
-	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
-	writel(phydata, LPC_ENET_MWTD(pldat->net_base));
-
-	/* Wait for completion */
-	while (readl(LPC_ENET_MIND(pldat->net_base)) & LPC_MIND_BUSY) {
-		if (time_after(jiffies,timeout))
-			return -EIO;
-		cpu_relax();
-	}
-	
-        phy_id = 4;  phyreg=4; phydata=0x5e1;
-	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
-	writel(phydata, LPC_ENET_MWTD(pldat->net_base));
-
-	/* Wait for completion */
-	while (readl(LPC_ENET_MIND(pldat->net_base)) & LPC_MIND_BUSY) {
-		if (time_after(jiffies,timeout))
-			return -EIO;
-		cpu_relax();
-	}
-#endif	
-#if 0	
-        phy_id = 5;  phyreg=0; phydata=0x2100;
-	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
-	writel(phydata, LPC_ENET_MWTD(pldat->net_base));
-
-	/* Wait for completion */
-	while (readl(LPC_ENET_MIND(pldat->net_base)) & LPC_MIND_BUSY) {
-		if (time_after(jiffies,timeout))
-			return -EIO;
-		cpu_relax();
-	}
-#endif	
 	return lps;
 }
 
@@ -648,11 +612,64 @@ err_out:
 	return err;
 }
 
+extern int ezvpn_eth_need_pause();
+
+static int check_need_pause(struct netdata_local *pldat)
+{
+	int rxconsidx, rxprodidx, num;
+	
+	/* num is packets in buffer need to process */
+	
+	rxconsidx = (int) readl(LPC_ENET_RXCONSUMEINDEX(pldat->net_base));
+	rxprodidx = (int) readl(LPC_ENET_RXPRODUCEINDEX(pldat->net_base));
+	
+	if(rxprodidx >= rxconsidx)
+	    num = rxprodidx - rxconsidx;
+	else
+	    num = ENET_RX_DESC - (rxconsidx - rxprodidx);   
+	
+	return (num >= (ENET_RX_DESC*2/3));  
+}
+
+static void start_pause_frame(struct netdata_local *pldat)
+{
+	u32 tmp;
+
+	writel(0xFFFF0000, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
+
+	tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
+	tmp |= LPC_COMMAND_TXFLOWCONTROL;
+	writel(tmp, LPC_ENET_COMMAND(pldat->net_base));
+}
+
+static void stop_pause_frame(struct netdata_local *pldat)
+{
+	u32 tmp;
+
+	tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
+	tmp &= ~LPC_COMMAND_TXFLOWCONTROL;
+	writel(tmp, LPC_ENET_COMMAND(pldat->net_base));
+}
+
 static void __lpc_handle_xmit(struct net_device *ndev)
 {
 	struct netdata_local *pldat = netdev_priv(ndev);
 	struct sk_buff *skb;
 	unsigned int txcidx, *ptxstat, txstat;
+
+	u32 tmp;
+        tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
+	
+        if((tmp&LPC_COMMAND_TXFLOWCONTROL)==0 && ezvpn_eth_need_pause())
+	{
+	    start_pause_frame(pldat);
+	    /*printk(KERN_DEBUG "lpc_rx_pause: start, status=0x%x\n", readl(LPC_ENET_FLOWCONTROLSTATUS(pldat->net_base)));*/
+	}
+	else if((tmp&LPC_COMMAND_TXFLOWCONTROL) && !ezvpn_eth_need_pause())
+	{
+	    /*printk(KERN_DEBUG "lpc_rx_pause: stop, status=0x%x\n", readl(LPC_ENET_FLOWCONTROLSTATUS(pldat->net_base)));*/
+	    stop_pause_frame(pldat);
+	}
 
 	txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
 	while (pldat->last_tx_idx != txcidx)
@@ -713,45 +730,6 @@ static void __lpc_handle_xmit(struct net_device *ndev)
 		netif_wake_queue(ndev);
 }
 
-extern int ezvpn_eth_need_pause();
-
-static int check_need_pause(struct netdata_local *pldat)
-{
-	int rxconsidx, rxprodidx, num;
-	
-	/* num is packets in buffer need to process */
-	
-	rxconsidx = (int) readl(LPC_ENET_RXCONSUMEINDEX(pldat->net_base));
-	rxprodidx = (int) readl(LPC_ENET_RXPRODUCEINDEX(pldat->net_base));
-	
-	if(rxprodidx >= rxconsidx)
-	    num = rxprodidx - rxconsidx;
-	else
-	    num = ENET_RX_DESC - (rxconsidx - rxprodidx);   
-	
-	return (num >= (ENET_RX_DESC*2/3));  
-}
-
-static void start_pause_frame(struct netdata_local *pldat)
-{
-	u32 tmp;
-
-	writel(0xFFFF0000, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
-
-	tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
-	tmp |= LPC_COMMAND_TXFLOWCONTROL;
-	writel(tmp, LPC_ENET_COMMAND(pldat->net_base));
-}
-
-static void stop_pause_frame(struct netdata_local *pldat)
-{
-	u32 tmp;
-
-	tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
-	tmp &= ~LPC_COMMAND_TXFLOWCONTROL;
-	writel(tmp, LPC_ENET_COMMAND(pldat->net_base));
-}
-
 static void __lpc_handle_recv(struct net_device *ndev)
 {
 	struct netdata_local *pldat = netdev_priv(ndev);
@@ -766,13 +744,12 @@ static void __lpc_handle_recv(struct net_device *ndev)
         if((tmp&LPC_COMMAND_TXFLOWCONTROL)==0 && ezvpn_eth_need_pause())
 	{
 	    start_pause_frame(pldat);
-	    printk(KERN_DEBUG "lpc_rx_pause: start, status=0x%x\n", readl(LPC_ENET_FLOWCONTROLSTATUS(pldat->net_base)));
+	    /*printk(KERN_DEBUG "lpc_rx_pause: start, status=0x%x\n", readl(LPC_ENET_FLOWCONTROLSTATUS(pldat->net_base)));*/
 	}
 	else if((tmp&LPC_COMMAND_TXFLOWCONTROL) && !ezvpn_eth_need_pause())
 	{
-	    printk(KERN_DEBUG "lpc_rx_pause: stop, status=0x%x\n", readl(LPC_ENET_FLOWCONTROLSTATUS(pldat->net_base)));
+	    /*printk(KERN_DEBUG "lpc_rx_pause: stop, status=0x%x\n", readl(LPC_ENET_FLOWCONTROLSTATUS(pldat->net_base)));*/
 	    stop_pause_frame(pldat);
-	   // printk(KERN_DEBUG "lpc_rx_pause: stop\n");
 	}
 	
 	/* Get the current RX buffer indexes */
