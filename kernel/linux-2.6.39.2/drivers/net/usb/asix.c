@@ -42,7 +42,7 @@
 #include "axusbnet.c"
 #include "asix.h"
 
-#define DRV_VERSION	"4.13.0"
+#define DRV_VERSION	"4.16.0"
 
 static char version[] =
 KERN_INFO "ASIX USB Ethernet Adapter:v" DRV_VERSION
@@ -260,28 +260,11 @@ static int ax88772b_stop(struct usbnet *dev)
 
 static int ax88772b_reset(struct usbnet *dev)
 {
-	int ret, i;
-	void *buf;
-
-	buf = kmalloc(6, GFP_KERNEL);
-	if (!buf) {
-		deverr(dev, "Cannot allocate memory for buffer");
-		return -ENOMEM;
-	}
-
-	memset(buf, 0, ETH_ALEN);
-
-	for (i = 0; i < (ETH_ALEN >> 1); i++) {
-		ret = ax8817x_read_cmd(dev, AX_CMD_READ_EEPROM, 0x04 + i,
-					    0, 2, (buf + i * 2));
-		if (ret < 0)
-			deverr(dev, "read SROM address 04h failed: %d", ret);
-	}
-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
+	int ret;
 
 	/* Set the MAC address */
 	ret = ax8817x_write_cmd(dev, AX88772_CMD_WRITE_NODE_ID,
-				0, 0, ETH_ALEN, buf);
+				0, 0, ETH_ALEN, dev->net->dev_addr);
 	if (ret < 0)
 		deverr(dev, "set MAC address failed: %d", ret);
 
@@ -297,7 +280,6 @@ static int ax88772b_reset(struct usbnet *dev)
 	if (ret < 0)
 		deverr(dev, "Write medium mode register: %d", ret);
 
-	kfree(buf);
 	return ret;
 }
 
@@ -649,14 +631,22 @@ static void ax88772b_set_multicast(struct net_device *net)
 static int ax8817x_mdio_read(struct net_device *netdev, int phy_id, int loc)
 {
 	struct usbnet *dev = netdev_priv(netdev);
-	u16 *res;
-	u16 ret;
+	u16 *res, ret;
+	u8 smsr;
+	int i = 0;
 
 	res = kmalloc(2, GFP_ATOMIC);
 	if (!res)
 		return 0;
 
-	ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
+	do {
+		ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
+		
+		msleep(1);
+
+		ax8817x_read_cmd(dev, AX_CMD_READ_STATMNGSTS_REG, 0, 0, 1, &smsr);
+	} while (!(smsr & AX_HOST_EN) && (i++ < 30));
+	
 	ax8817x_read_cmd(dev, AX_CMD_READ_MII_REG, phy_id, (__u16)loc, 2, res);
 	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, NULL);
 
@@ -703,13 +693,22 @@ ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, int val)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u16 *res;
+	u8 smsr;
+	int i = 0;
 
 	res = kmalloc(2, GFP_ATOMIC);
 	if (!res)
 		return;
 	*res = val;
 
-	ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
+	do {
+		ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
+
+		msleep(1);
+
+		ax8817x_read_cmd(dev, AX_CMD_READ_STATMNGSTS_REG, 0, 0, 1, &smsr);
+	} while (!(smsr & AX_HOST_EN) && (i++ < 30));	
+		
 	ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG, phy_id,
 			  (__u16)loc, 2, res);
 	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, NULL);
@@ -826,6 +825,12 @@ static int ax88772b_suspend(struct usb_interface *intf,
 	tmp32 |= 0xFFF2FFFF;
 	ax8817x_write_cmd(dev, AX_CMD_WRITE_WKFARY, 0x0b, 0, 4, &tmp32);
 #endif
+	/* Preserve BMCR for restoring */
+	ax772b_data->presvd_phy_bmcr = ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_BMCR);
+
+	/* Preserve Advertisement control reg for restoring */
+	ax772b_data->presvd_phy_advertise = ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_ADVERTISE);
+
 	ax8817x_read_cmd(dev, AX_CMD_READ_MEDIUM_MODE, 0, 0, 2, tmp16);
 	ax8817x_write_cmd(dev, AX_CMD_WRITE_MEDIUM_MODE,
 			  (*tmp16 & ~AX88772_MEDIUM_RX_ENABLE),
@@ -1071,6 +1076,144 @@ static const struct net_device_ops ax88178_netdev_ops = {
 };
 #endif
 
+static int access_eeprom_mac(struct usbnet *dev, u8 *buf, u8 offset, bool wflag)
+{
+	int ret = 0, i;
+	u16* tmp = (u16*)buf;
+
+	if (wflag) {
+		ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_EEPROM_EN,
+						0, 0, 0, NULL);
+		if (ret < 0)
+			 return ret;
+
+		mdelay(15);
+	}
+
+	for (i = 0; i < (ETH_ALEN >> 1); i++) {
+		if (wflag) {
+			u16 wd = cpu_to_le16(*(tmp + i));
+			ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_EEPROM, offset + i,
+						wd, 0, NULL);
+			if (ret < 0)
+				break;
+
+			mdelay(15);
+		}
+		else {
+			ret = ax8817x_read_cmd(dev, AX_CMD_READ_EEPROM,
+					       offset + i, 0, 2, tmp + i);
+			if (ret < 0)
+				break;
+		}
+	}
+
+	if (!wflag) {
+		if (ret < 0) {
+			netdev_dbg(dev->net, "Failed to read MAC address from EEPROM: %d\n", ret);
+			return ret;
+		}
+		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
+	}
+	else {
+		ax8817x_write_cmd(dev, AX_CMD_WRITE_EEPROM_DIS,
+				  0, 0, 0, NULL);
+		if (ret < 0)
+			 return ret;
+
+		/* reload eeprom data */
+		ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_GPIOS,
+					AXGPIOS_RSE, 0, 0, NULL);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int ax8817x_check_ether_addr(struct usbnet *dev)
+{
+	unsigned char *tmp = (unsigned char*)dev->net->dev_addr;
+	u8 default_mac[6] = {0, 0x0e, 0xc6, 0x87, 0x72, 0x01};
+
+	if (((*((u8*)tmp) == 0) && (*((u8*)tmp + 1) == 0) && (*((u8*)tmp + 2) == 0)) ||
+	    !is_valid_ether_addr((u8*)tmp) ||
+	    !memcmp(dev->net->dev_addr, default_mac, ETH_ALEN)) {
+		int i;
+
+		printk("Found invalid EEPROM MAC address value ");
+
+		for (i = 0; i < ETH_ALEN; i++) {
+			printk("%02X", *((u8*)tmp + i));
+			if (i != 5)
+				printk("-");
+		}
+		printk("\n");
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
+		eth_hw_addr_random(dev->net);
+#else
+		dev->net->addr_assign_type |= NET_ADDR_RANDOM;
+		random_ether_addr(dev->net->dev_addr); 
+#endif
+		*tmp = 0;
+		*(tmp + 1) = 0x0E;
+		*(tmp + 2) = 0xC6;
+		*(tmp + 3) = 0x8F;
+
+		return -EADDRNOTAVAIL;	
+	} 
+	return 0;
+}
+
+static int ax8817x_get_mac(struct usbnet *dev, u8* buf)
+{
+	int ret, i;
+	
+
+	ret = access_eeprom_mac(dev, buf, 0x04, 0);
+	if (ret < 0)
+		goto out;
+
+	if (ax8817x_check_ether_addr(dev)) {
+		ret = access_eeprom_mac(dev, dev->net->dev_addr, 0x04, 1);
+		if (ret < 0) {
+			deverr(dev, "Failed to write MAC to EEPROM: %d", ret);
+			goto out;
+		}
+
+		msleep(5);
+
+		ret = ax8817x_read_cmd(dev, AX88772_CMD_READ_NODE_ID,
+				       0, 0, ETH_ALEN, buf);
+		if (ret < 0) {
+			deverr(dev, "Failed to read MAC address: %d", ret);
+			goto out;
+		}
+
+		for (i = 0; i < ETH_ALEN; i++)
+			if (*(dev->net->dev_addr + i) != *((u8*)buf + i)) {
+				devwarn(dev, "Found invalid EEPROM part or non-EEPROM");
+				break;
+			}
+	}
+
+	memcpy(dev->net->perm_addr, dev->net->dev_addr, ETH_ALEN);
+
+	/* Set the MAC address */
+	ax8817x_write_cmd (dev, AX88772_CMD_WRITE_NODE_ID, 0, 0,
+			   ETH_ALEN, dev->net->dev_addr);
+	
+	if (ret < 0) {
+		deverr(dev, "Failed to write MAC address: %d", ret);
+		goto out;
+	}
+
+	return 0;
+out:
+	return ret;
+}
+
 static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 {
 	int ret = 0;
@@ -1307,13 +1450,11 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
 
 	/* Get the MAC address */
 	memset(buf, 0, ETH_ALEN);
-	ret = ax8817x_read_cmd(dev, AX88772_CMD_READ_NODE_ID, 0, 0,
-			       ETH_ALEN, buf);
+	ret = ax8817x_get_mac(dev, buf);
 	if (ret < 0) {
-		deverr(dev, "Failed to read MAC address: %d", ret);
+		deverr(dev, "Get HW address failed: %d", ret);
 		goto out2;
 	}
-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
 
 	ret = ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
 	if (ret < 0) {
@@ -1588,13 +1729,11 @@ static int ax88772a_bind(struct usbnet *dev, struct usb_interface *intf)
 
 	/* Get the MAC address */
 	memset(buf, 0, ETH_ALEN);
-	ret = ax8817x_read_cmd(dev, AX88772_CMD_READ_NODE_ID,
-			       0, 0, ETH_ALEN, buf);
+	ret = ax8817x_get_mac(dev, buf);
 	if (ret < 0) {
-		deverr(dev, "Failed to read MAC address: %d", ret);
+		deverr(dev, "Get HW address failed: %d", ret);
 		goto out2;
-	}
-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
+	}	
 
 	/* make sure the driver can enable sw mii operation */
 	ret = ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
@@ -1818,7 +1957,6 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 	struct ax8817x_data *data = (struct ax8817x_data *)&dev->data;
 	struct ax88772b_data *ax772b_data;
 	u16 *tmp16;
-	u8 i;
 	u8 tempphyselect;
 	bool internalphy;
 
@@ -1903,23 +2041,11 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 	ax772b_data->psc = *tmp16 & 0xFF00;
 	/* End of get EEPROM data */
 
-	/* Get the MAC address from EEPROM */
+	/* Get the MAC address */
 	memset(buf, 0, ETH_ALEN);
-	for (i = 0; i < (ETH_ALEN >> 1); i++) {
-		ret = ax8817x_read_cmd(dev, AX_CMD_READ_EEPROM,
-					0x04 + i, 0, 2, (buf + i * 2));
-		if (ret < 0) {
-			deverr(dev, "read SROM address 04h failed: %d", ret);
-			goto err_out;
-		}
-	}
-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-
-	/* Set the MAC address */
-	ret = ax8817x_write_cmd(dev, AX88772_CMD_WRITE_NODE_ID,
-				0, 0, ETH_ALEN, buf);
+	ret = ax8817x_get_mac(dev, buf);
 	if (ret < 0) {
-		deverr(dev, "set MAC address failed: %d", ret);
+		deverr(dev, "Get HW address failed: %d", ret);
 		goto err_out;
 	}
 
@@ -2973,13 +3099,9 @@ static int ax88178_bind(struct usbnet *dev, struct usb_interface *intf)
 
 	/* Get the MAC address */
 	memset(buf, 0, ETH_ALEN);
-	ret = ax8817x_read_cmd(dev, AX88772_CMD_READ_NODE_ID,
-			       0, 0, ETH_ALEN, buf);
-	if (ret < 0) {
-		deverr(dev, "read AX_CMD_READ_NODE_ID failed: %d", ret);
+	ax8817x_get_mac(dev, buf);
+	if (ret < 0)
 		goto error_out;
-	}
-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
 	/* End of get MAC address */
 
 	ret = ax88178_phy_init(dev, ax178dataptr);
@@ -3070,6 +3192,8 @@ static int ax88772_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 #endif
 			}
 			skb->truesize = size + sizeof(struct sk_buff);
+			skb->len = size;
+
 			return 2;
 		}
 
@@ -3077,9 +3201,14 @@ static int ax88772_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 			deverr(dev, "invalid rx length %d", size);
 			return 0;
 		}
+#ifndef RX_SKB_COPY
 		ax_skb = skb_clone(skb, GFP_ATOMIC);
+#else
+		ax_skb = alloc_skb(size + NET_IP_ALIGN, GFP_ATOMIC);	
+		skb_reserve(ax_skb, NET_IP_ALIGN);
+#endif
 		if (ax_skb) {
-
+#ifndef RX_SKB_COPY
 			/* Make sure ip header is aligned on 32-bit boundary */
 			if (!((unsigned long)packet & 0x02)) {
 				memmove(packet - 2, packet, size);
@@ -3090,6 +3219,11 @@ static int ax88772_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 			ax_skb->tail = packet + size;
 #else
 			skb_set_tail_pointer(ax_skb, size);
+#endif
+
+#else
+			skb_put(ax_skb, size);
+			memcpy(ax_skb->data, packet , size);
 #endif
 			ax_skb->truesize = size + sizeof(struct sk_buff);
 			axusbnet_skb_return(dev, ax_skb);
@@ -3225,9 +3359,14 @@ static int ax88772b_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 
 			return 2;
 		}
-
+#ifndef RX_SKB_COPY
 		ax_skb = skb_clone(skb, GFP_ATOMIC);
+#else
+		ax_skb = alloc_skb(rx_hdr.len + NET_IP_ALIGN, GFP_ATOMIC);
+		skb_reserve(ax_skb, NET_IP_ALIGN);	
+#endif
 		if (ax_skb) {
+#ifndef RX_SKB_COPY
 			ax_skb->len = rx_hdr.len;
 			ax_skb->data = skb->data +
 				       sizeof(struct ax88772b_rx_header);
@@ -3237,6 +3376,12 @@ static int ax88772b_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 #else
 			skb_set_tail_pointer(ax_skb, rx_hdr.len);
 #endif
+
+#else
+			skb_put(ax_skb, rx_hdr.len);
+			memcpy(ax_skb->data, skb->data + sizeof(struct ax88772b_rx_header), rx_hdr.len); 
+#endif
+
 			ax_skb->truesize = rx_hdr.len + sizeof(struct sk_buff);
 
 			if (ax772b_data->checksum & AX_RX_CHECKSUM)
@@ -3324,6 +3469,37 @@ static const u8 chkcntsel[6][3] = {
 	{31, 23, 12}
 };
 
+static void ax88772_save_bmcr_anar(struct usbnet *dev)
+{
+	struct ax88772_data *ax772_data = (struct ax88772_data *)dev->priv;
+
+	if (ax772_data) {
+		/* Preserve BMCR for restoring */
+		ax772_data->presvd_phy_bmcr =
+			ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_BMCR);
+
+		/* Preserve Advertisement control reg for restoring */
+		ax772_data->presvd_phy_advertise =
+			ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_ADVERTISE);
+	}
+}
+
+static void ax88772_restore_bmcr_anar(struct usbnet *dev)
+{
+	struct ax88772_data *ax772_data = (struct ax88772_data *)dev->priv;
+
+	if (ax772_data && ax772_data->presvd_phy_advertise && ax772_data->presvd_phy_bmcr) {
+		/* Restore Advertisement control reg */
+		ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, MII_ADVERTISE,
+				      ax772_data->presvd_phy_advertise);
+		/* Restore BMCR */
+		ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, MII_BMCR,
+				      ax772_data->presvd_phy_bmcr);
+		ax772_data->presvd_phy_advertise = 0;
+		ax772_data->presvd_phy_bmcr = 0;
+	}
+}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 20)
 static void ax88772_link_reset(void *data)
 {
@@ -3366,6 +3542,7 @@ static void ax88772_link_reset(struct work_struct *work)
 		break;
 	case PHY_POWER_DOWN:
 		if (ax772_data->TickToExpire == 23) {
+			ax88772_save_bmcr_anar(dev);
 			/* Set Phy Power Down */
 			ax8817x_write_cmd(dev, AX_CMD_SW_RESET, AX_SWRESET_IPPD,
 					  0, 0, NULL);
@@ -3385,11 +3562,16 @@ static void ax88772_link_reset(struct work_struct *work)
 			ax8817x_write_cmd(dev, AX_CMD_SW_RESET,
 				AX_SWRESET_IPRL, 0, 0, NULL);
 
-			ax8817x_mdio_write_le(dev->net, dev->mii.phy_id,
-					      MII_ADVERTISE,
-					      ADVERTISE_ALL | ADVERTISE_CSMA |
-					      ADVERTISE_PAUSE_CAP);
-			mii_nway_restart(&dev->mii);
+			if (ax772_data->presvd_phy_advertise && ax772_data->presvd_phy_bmcr) {
+				ax88772_restore_bmcr_anar(dev);
+				
+			} else {
+				ax8817x_mdio_write_le(dev->net, dev->mii.phy_id,
+						      MII_ADVERTISE,
+						      ADVERTISE_ALL | ADVERTISE_CSMA |
+						      ADVERTISE_PAUSE_CAP);
+				mii_nway_restart(&dev->mii);
+			}
 
 			ax772_data->Event = PHY_POWER_UP;
 			ax772_data->TickToExpire = 47;
@@ -3440,6 +3622,19 @@ static void ax88772a_link_reset(struct work_struct *work)
 
 		ax8817x_write_cmd(dev, AX_CMD_WRITE_MEDIUM_MODE, mode,
 				  0, 0, NULL);
+
+		if (ax772a_data->presvd_phy_advertise && ax772a_data->presvd_phy_bmcr) {
+
+			/* Restore Advertisement control reg */
+			ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, MII_ADVERTISE,
+					      ax772a_data->presvd_phy_advertise);
+			/* Restore BMCR */
+			ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, MII_BMCR,
+					      ax772a_data->presvd_phy_bmcr);
+			ax772a_data->presvd_phy_advertise = 0;
+			ax772a_data->presvd_phy_bmcr = 0;
+		}
+
 		return;
 	}
 
@@ -3479,6 +3674,17 @@ static void ax88772a_link_reset(struct work_struct *work)
 			ax772a_data->Event = CHK_CABLE_STATUS;
 			ax772a_data->TickToExpire = 31;
 		} else if (--ax772a_data->TickToExpire == 0) {
+			if (!ax772a_data->presvd_phy_advertise && !ax772a_data->presvd_phy_bmcr) {
+				/* Preserve BMCR for restoring */
+				ax772a_data->presvd_phy_bmcr =
+					ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_BMCR);
+
+				/* Preserve Advertisement control reg for restoring */
+				ax772a_data->presvd_phy_advertise =
+					ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_ADVERTISE);
+			}
+
+
 			/* Power down PHY */
 			ax8817x_write_cmd(dev, AX_CMD_SW_RESET,
 					  AX_SWRESET_IPPD,
@@ -3511,6 +3717,16 @@ static void ax88772a_link_reset(struct work_struct *work)
 		}
 		break;
 	case PHY_POWER_UP:
+
+		if (!ax772a_data->presvd_phy_advertise && !ax772a_data->presvd_phy_bmcr) {
+			/* Preserve BMCR for restoring */
+			ax772a_data->presvd_phy_bmcr =
+				ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_BMCR);
+
+			/* Preserve Advertisement control reg for restoring */
+			ax772a_data->presvd_phy_advertise =
+				ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_ADVERTISE);
+		}
 
 		ax88772a_phy_powerup(dev);
 
@@ -3574,13 +3790,30 @@ static void ax88772b_link_reset(struct work_struct *work)
 	{
 		u16 tmp16;
 
+		if (!ax772b_data->presvd_phy_advertise && !ax772b_data->presvd_phy_bmcr) {
+			/* Preserve BMCR for restoring */
+			ax772b_data->presvd_phy_bmcr =
+				ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_BMCR);
+
+			/* Preserve Advertisement control reg for restoring */
+			ax772b_data->presvd_phy_advertise =
+				ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_ADVERTISE);
+		}
+
 		ax88772a_phy_powerup(dev);
 		tmp16 = ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, 0x12);
 		ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, 0x12,
 				((tmp16 & 0xFF9F) | 0x0040));
 
+		/* Restore Advertisement control reg */
 		ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, MII_ADVERTISE,
-			ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP);
+				      ax772b_data->presvd_phy_advertise);
+		/* Restore BMCR */
+		ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, MII_BMCR,
+				      ax772b_data->presvd_phy_bmcr);
+		ax772b_data->presvd_phy_advertise = 0;
+		ax772b_data->presvd_phy_bmcr = 0;
+
 		break;
 	}
 

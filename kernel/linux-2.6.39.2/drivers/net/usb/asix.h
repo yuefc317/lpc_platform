@@ -11,6 +11,8 @@
  */
 #define AX_FORCE_BUFF_ALIGN		0
 
+//#define RX_SKB_COPY
+
 #define AX_MONITOR_MODE			0x01
 #define AX_MONITOR_LINK			0x02
 #define AX_MONITOR_MAGIC		0x04
@@ -64,6 +66,9 @@
 #define AX_CMD_SET_SW_MII		0x06
 #define AX_CMD_READ_MII_REG		0x07
 #define AX_CMD_WRITE_MII_REG		0x08
+#define AX_CMD_READ_STATMNGSTS_REG	0x09
+	#define AX_HOST_EN		0x01
+
 #define AX_CMD_SET_HW_MII		0x0a
 #define AX_CMD_READ_EEPROM		0x0b
 #define AX_CMD_WRITE_EEPROM		0x0c
@@ -433,6 +438,8 @@ struct ax88772b_data {
 	u8 checksum;
 	u8 PhySelect:1;
 	u8 OperationMode:1;
+	u16 presvd_phy_advertise;
+	u16 presvd_phy_bmcr;
 };
 
 /* define for MAC or PHY mode */
@@ -450,6 +457,8 @@ struct ax88772a_data {
 	u8 DlyIndex;
 	u8 DlySel;
 	u16 EepromData;
+	u16 presvd_phy_advertise;
+	u16 presvd_phy_bmcr;
 };
 
 struct ax88772_data {
@@ -459,6 +468,8 @@ struct ax88772_data {
 	unsigned long autoneg_start;
 	u8 Event;
 	u8 TickToExpire;
+	u16 presvd_phy_advertise;
+	u16 presvd_phy_bmcr;
 };
 
 #define AX_RX_CHECKSUM		1
