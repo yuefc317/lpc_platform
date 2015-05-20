@@ -415,6 +415,7 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 	struct netdata_local *pldat = bus->priv;
 	unsigned long timeout = jiffies + msecs_to_jiffies(100);
 	int lps;
+	u16 phydata;
 
         phy_id = phy_id_map_for_ezvpn(phy_id);
       
@@ -435,6 +436,17 @@ static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
 	
         /*printk(KERN_DEBUG "lpc_mdio_read: phy_id=0x%x phy_reg=0x%x value=0x%x\n", phy_id, phyreg, lps);*/
 
+        phy_id = 5; phyreg = 4; phydata = 0x5e1;
+	writel(((phy_id << 8) | phyreg), LPC_ENET_MADR(pldat->net_base));
+	writel(phydata, LPC_ENET_MWTD(pldat->net_base));
+
+	/* Wait for completion */
+	while (readl(LPC_ENET_MIND(pldat->net_base)) & LPC_MIND_BUSY) {
+		if (time_after(jiffies,timeout))
+			return -EIO;
+		cpu_relax();
+	}
+	
 	return lps;
 }
 
@@ -635,7 +647,7 @@ static void start_pause_frame(struct netdata_local *pldat)
 {
 	u32 tmp;
 
-	writel(0xFFFF0000, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
+	writel(0x0FFF0000, LPC_ENET_FLOWCONTROLCOUNTER(pldat->net_base));
 
 	tmp = readl(LPC_ENET_COMMAND(pldat->net_base));
 	tmp |= LPC_COMMAND_TXFLOWCONTROL;
