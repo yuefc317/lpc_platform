@@ -599,6 +599,15 @@ static const struct usb_device_id	products [] = {
 	.bInterfaceSubClass	= USB_CDC_SUBCLASS_ETHERNET,
 	.bInterfaceProtocol	= 255,
 	.driver_info = (unsigned long)&wwan_info,
+}, {
+	/* Various Huawei modems with a network port like the UMG1831 */
+	.match_flags    =   USB_DEVICE_ID_MATCH_VENDOR
+		 | USB_DEVICE_ID_MATCH_INT_INFO,
+	.idVendor               = HUAWEI_VENDOR_ID,
+	.bInterfaceClass	= USB_CLASS_CDC_DATA,
+	.bInterfaceSubClass	= USB_CDC_SUBCLASS_ETHERNET,
+	.bInterfaceProtocol	= 0,
+	.driver_info = (unsigned long)&wwan_info,
 },
 	{ },		// END
 };
