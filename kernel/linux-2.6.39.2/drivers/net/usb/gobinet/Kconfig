@@ -1,0 +1,5 @@
+config USB_GOBINET
+	tristate "SIMCOM Modem USB Ethernet driver"
+	default m
+	help
+	  Module used to access internet by SIMCOM modem

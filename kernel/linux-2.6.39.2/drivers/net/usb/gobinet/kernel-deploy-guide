@@ -1,0 +1,11 @@
+1. 拷贝当前文件夹到drivers/net/usb/
+
+2. 修改drivers/net/usb/Kconfig
+   在结尾, endmenu之前添加
+   source "drivers/net/usb/gobinet/Kconfig"
+
+3. 修改drivers/net/usb/Makefile
+   在结尾添加
+   obj-$(CONFIG_USB_GOBINET)       += gobinet/
+
+4. cd进入gobinet目录，将Makefile.kernel重命名为Makefile
