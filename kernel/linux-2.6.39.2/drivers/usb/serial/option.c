@@ -273,7 +273,9 @@ static void option_instat_callback(struct urb *urb);
 #define ALINK_VENDOR_ID				0x1e0e
 #define ALINK_PRODUCT_PH300			0x9100
 #define ALINK_PRODUCT_3GU			0x9200
-#define SIMCOM_PRODUCT_7100C			0x9001
+
+#define SIMCOM_SIM7100_VID                      0x1E0E
+#define SIMCOM_SIM7100_PID                      0x9001
 
 /* ALCATEL PRODUCTS */
 #define ALCATEL_VENDOR_ID			0x1bbb
@@ -381,7 +383,6 @@ static const struct option_blacklist_info zte_k3765_z_blacklist = {
 	.ifaceinfo = zte_k3765_z_no_sendsetup,
 	.reason = OPTION_BLACKLIST_SENDSETUP
 };
-
 
 static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_COLT) },
@@ -1169,8 +1170,8 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(TOSHIBA_VENDOR_ID, TOSHIBA_PRODUCT_G450) },
 	{ USB_DEVICE(TOSHIBA_VENDOR_ID, TOSHIBA_PRODUCT_HSDPA_MINICARD ) }, /* Toshiba 3G HSDPA == Novatel Expedite EU870D MiniCard */
 	{ USB_DEVICE(ALINK_VENDOR_ID, 0x9000) },
-	{ USB_DEVICE(ALINK_VENDOR_ID, SIMCOM_PRODUCT_7100C) },   /* SIMCOM 7100C 4G modem */
 	{ USB_DEVICE(ALINK_VENDOR_ID, ALINK_PRODUCT_PH300) },
+	{ USB_DEVICE(SIMCOM_SIM7100_VID, SIMCOM_SIM7100_PID) },   /* SIMCOM 7100C 4G modem */
 	{ USB_DEVICE_AND_INTERFACE_INFO(ALINK_VENDOR_ID, ALINK_PRODUCT_3GU, 0xff, 0xff, 0xff) },
 	{ USB_DEVICE(ALCATEL_VENDOR_ID, ALCATEL_PRODUCT_X060S_X200),
 	  .driver_info = (kernel_ulong_t)&alcatel_x200_blacklist
@@ -1355,6 +1356,12 @@ static int option_probe(struct usb_serial *serial,
 		serial->dev->descriptor.idProduct == SAMSUNG_PRODUCT_GT_B3730 &&
 		serial->interface->cur_altsetting->desc.bInterfaceClass != USB_CLASS_CDC_DATA)
 		return -ENODEV;
+        
+	/* Don't bind network interface on sim7100 */
+        if (serial->dev->descriptor.idVendor == SIMCOM_SIM7100_VID &&
+                serial->dev->descriptor.idProduct == SIMCOM_SIM7100_PID &&
+                serial->interface->cur_altsetting->desc.bInterfaceNumber == 5 )
+                return -ENODEV;
 
 	data = serial->private = kzalloc(sizeof(struct usb_wwan_intf_private), GFP_KERNEL);
 
