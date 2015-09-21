@@ -34,6 +34,7 @@
 #include <linux/amba/mmci.h>
 #include <linux/kthread.h>
 #include <mtd/mtd-abi.h>
+#include <sound/uda1380.h>
 
 #include <asm/setup.h>
 #include <asm/mach-types.h>
@@ -1524,6 +1525,8 @@ static struct platform_device lpc32xx_net_device = {
 /*
  * I2C devices support
  */
+#if 0 
+
 #if defined (CONFIG_LEDS_PCA9532) || defined (CONFIG_EEPROM_AT24) || defined (CONFIG_FB_ARMCLCD)
 	static struct i2c_board_info __initdata ea3250_i2c_board_info [] = {
 #if defined (CONFIG_LEDS_PCA9532)
@@ -1547,6 +1550,21 @@ static struct platform_device lpc32xx_net_device = {
 		},
 #endif
 	};
+#endif
+
+#else
+static struct uda1380_platform_data uda1380_info = {
+	.gpio_power = LPC32XX_GPIO(LPC32XX_GPO_P3_GRP,10),
+	.gpio_reset = LPC32XX_GPIO(LPC32XX_GPO_P3_GRP,2),
+	.dac_clk    = UDA1380_DAC_CLK_WSPLL,
+};
+
+	static struct i2c_board_info __initdata ea3250_i2c_board_info [] = {
+	    {
+		I2C_BOARD_INFO("uda1380", 0x18),
+		.platform_data = &uda1380_info,
+	    },
+        };
 #endif
 
 static struct platform_device* ea3250_devs[] __initdata = {
@@ -1577,7 +1595,7 @@ static struct platform_device* ea3250_devs[] __initdata = {
 void __init ea3250_board_init(void)
 {
 	u32 tmp;
-
+		
 	/* Intiliase GPIO */
 	lpc32xx_gpio_init();
 
@@ -1663,6 +1681,8 @@ void __init ea3250_board_init(void)
 	/*i2c_register_board_info(0, ea3250_i2c_board_info,
 			ARRAY_SIZE(ea3250_i2c_board_info));*/
 #endif
+          tmp = i2c_register_board_info(0, ea3250_i2c_board_info,
+			ARRAY_SIZE(ea3250_i2c_board_info));
 
 	/* Register the I2C driver for LCD */
 	/*init_ea_i2c_video(); */
