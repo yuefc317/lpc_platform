@@ -447,8 +447,8 @@ static int uda1380_set_dai_fmt_both(struct snd_soc_dai *codec_dai,
 	}
 
 	/* DATAI is slave only, so in single-link mode, this has to be slave */
-	if ((fmt & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBS_CFS)
-		return -EINVAL;
+	/*if ((fmt & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBS_CFS)
+		return -EINVAL; */
 
 	uda1380_write(codec, UDA1380_IFACE, iface);
 
@@ -477,8 +477,8 @@ static int uda1380_set_dai_fmt_playback(struct snd_soc_dai *codec_dai,
 	}
 
 	/* DATAI is slave only, so this has to be slave */
-	if ((fmt & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBS_CFS)
-		return -EINVAL;
+	/*if ((fmt & SND_SOC_DAIFMT_MASTER_MASK) != SND_SOC_DAIFMT_CBS_CFS)
+		return -EINVAL; */
 
 	uda1380_write(codec, UDA1380_IFACE, iface);
 
@@ -506,8 +506,8 @@ static int uda1380_set_dai_fmt_capture(struct snd_soc_dai *codec_dai,
 		iface |= R01_SFORO_MSB;
 	}
 
-	if ((fmt & SND_SOC_DAIFMT_MASTER_MASK) == SND_SOC_DAIFMT_CBM_CFM)
-		iface |= R01_SIM;
+	/*if ((fmt & SND_SOC_DAIFMT_MASTER_MASK) == SND_SOC_DAIFMT_CBM_CFM)
+		iface |= R01_SIM; */
 
 	uda1380_write(codec, UDA1380_IFACE, iface);
 
@@ -718,13 +718,13 @@ static struct snd_soc_dai_driver uda1380_dai[] = {
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = UDA1380_RATES,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
+		.formats = /*SNDRV_PCM_FMTBIT_S16_LE |*/ SNDRV_PCM_FMTBIT_S32_LE,},
 	.capture = {
 		.stream_name = "Capture",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = UDA1380_RATES,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
+		.formats = /*SNDRV_PCM_FMTBIT_S16_LE |*/ SNDRV_PCM_FMTBIT_S32_LE,},
 	.ops = &uda1380_dai_ops,
 },
 { /* playback only - dual interface */
@@ -734,8 +734,7 @@ static struct snd_soc_dai_driver uda1380_dai[] = {
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = UDA1380_RATES,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-	},
+		.formats = /*SNDRV_PCM_FMTBIT_S16_LE |*/ SNDRV_PCM_FMTBIT_S32_LE,},
 	.ops = &uda1380_dai_ops_playback,
 },
 { /* capture only - dual interface*/
@@ -745,8 +744,7 @@ static struct snd_soc_dai_driver uda1380_dai[] = {
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = UDA1380_RATES,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-	},
+		.formats = /*SNDRV_PCM_FMTBIT_S16_LE |*/ SNDRV_PCM_FMTBIT_S32_LE,},
 	.ops = &uda1380_dai_ops_capture,
 },
 };
