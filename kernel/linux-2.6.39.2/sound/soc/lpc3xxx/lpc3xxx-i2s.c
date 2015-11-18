@@ -260,12 +260,13 @@ static int lpc3xxx_i2s_hw_params(struct snd_pcm_substream *substream,
 			break;
 
 		case SNDRV_PCM_FMTBIT_S16:
-		case SND_SOC_DAIFMT_I2S:
+		//case SND_SOC_DAIFMT_I2S:
 			tmp |= I2S_WW16 | I2S_WS_HP(I2S_WW16_HP);
 			xfersize = 2;
 			break;
 
 		case SNDRV_PCM_FMTBIT_S32:
+		case SND_SOC_DAIFMT_I2S:
 			tmp |= I2S_WW32 | I2S_WS_HP(I2S_WW32_HP);
 			xfersize = 4;
 			break;
