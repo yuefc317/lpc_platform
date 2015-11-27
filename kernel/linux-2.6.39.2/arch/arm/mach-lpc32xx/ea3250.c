@@ -1604,6 +1604,11 @@ void __init ea3250_board_init(void)
 	mmc_power_enable(1);
 #endif
 
+        /* setup mux register to use I2S1 and UART7 */
+	__raw_writel(( _BIT(15) | _BIT(4) | _BIT(3) | _BIT(2) ), LPC32XX_GPIO_P_MUX_CLR); /* U7_TX, I2S1TX WS CLK SDA */
+	__raw_writel(( _BIT(1) | _BIT(0) ), LPC32XX_GPIO_P0_MUX_SET); /* I2S1RX WS CLK */
+
+
 	/* Set SPI CS GPIO to output */
 	gpio_request(SPI0_CS_GPIO, "spi0 cs");
 	gpio_direction_output(SPI0_CS_GPIO, 1);
