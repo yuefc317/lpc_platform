@@ -1555,7 +1555,7 @@ static struct platform_device lpc32xx_net_device = {
 #else
 static struct uda1380_platform_data uda1380_info = {
 	.gpio_power = LPC32XX_GPIO(LPC32XX_GPO_P3_GRP,10),
-	.gpio_reset = LPC32XX_GPIO(LPC32XX_GPO_P3_GRP,2),
+	.gpio_reset = LPC32XX_GPIO(LPC32XX_GPO_P3_GRP,0),
 	.dac_clk    = UDA1380_DAC_CLK_WSPLL,
 };
 
