@@ -1607,6 +1607,11 @@ void __init ea3250_board_init(void)
         /* setup mux register to use I2S1 and UART7 */
 	__raw_writel(( _BIT(15) | _BIT(4) | _BIT(3) | _BIT(2) ), LPC32XX_GPIO_P_MUX_CLR); /* U7_TX, I2S1TX WS CLK SDA */
 	__raw_writel(( _BIT(1) | _BIT(0) ), LPC32XX_GPIO_P0_MUX_SET); /* I2S1RX WS CLK */
+	
+	/* disable uart7 loopback mode */
+	tmp = __raw_readl(LPC32XX_UARTCTL_CLOOP);
+	tmp &= ~0x40;
+	__raw_writel(tmp, LPC32XX_UARTCTL_CLOOP); /* UART LOOPBACK CONTROL */
 
 
 	/* Set SPI CS GPIO to output */
