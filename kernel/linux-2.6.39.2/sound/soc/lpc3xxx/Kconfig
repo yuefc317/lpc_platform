@@ -11,7 +11,6 @@ config SND_LPC3XXX_SOC_I2S_UDA1380
         depends on SND_LPC3XXX_SOC
         select I2C
         select SND_SOC_UDA1380
-        select SND_LPC32XX_USEI2S1
         select SND_LPC32XX_SLAVE_TX_CLK_TO_RX
         help
           Say Y or M here if you want to add support for SoC audio
@@ -21,6 +20,7 @@ config SND_LPC3XXX_SOC_I2S_UDA1380
 config SND_LPC32XX_USEI2S1
         bool "Use I2S1 channel instead of I2S0"
         depends on SND_LPC3XXX_SOC
+	default y
         help
 	  The LPC32XX has 2 I2S channels (0 and 1). Normally, I2S0 is
 	  used for communications with an I2S codec. If I2S1 should be
