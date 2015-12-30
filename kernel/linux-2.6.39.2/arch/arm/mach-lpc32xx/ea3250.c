@@ -1604,9 +1604,9 @@ void __init ea3250_board_init(void)
 	mmc_power_enable(1);
 #endif
 
-        /* setup mux register to use I2S1 and UART7 */
+        /* setup mux register to use I2S1/I2S0 and UART7 */
 	__raw_writel(( _BIT(15) | _BIT(4) | _BIT(3) | _BIT(2) ), LPC32XX_GPIO_P_MUX_CLR); /* U7_TX, I2S1TX WS CLK SDA */
-	__raw_writel(( _BIT(1) | _BIT(0) ), LPC32XX_GPIO_P0_MUX_SET); /* I2S1RX WS CLK */
+	__raw_writel(( _BIT(4) | _BIT(3) | _BIT(2) | _BIT(1) | _BIT(0) ), LPC32XX_GPIO_P0_MUX_SET); /* I2S1RX WS CLK ,I2S0RX WS CLK SDA */
 	
 	/* disable uart7 loopback mode */
 	tmp = __raw_readl(LPC32XX_UARTCTL_CLOOP);
