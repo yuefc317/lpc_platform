@@ -1680,6 +1680,9 @@ static int __init lpc32xx_display_uid(void)
 	printk(KERN_INFO "LPC32XX unique ID: %08x%08x%08x%08x\n",
 			uid[3], uid[2], uid[1], uid[0]);
 
+        system_serial_low = uid[0];
+        system_serial_high = uid[1];
+	
 	return 1;
 }
 arch_initcall(lpc32xx_display_uid);
