@@ -415,10 +415,10 @@ static int __init ea3250_spi_devices_register(void)
 #endif
 
 	/* Configure ADS TS INT GPIO pin as input */
-	if (gpio_request(ADS_TS_GPIO, "ADS7846 TS INT"))
+	/*if (gpio_request(ADS_TS_GPIO, "ADS7846 TS INT"))
 		return -EIO;
 	if(gpio_direction_input(ADS_TS_GPIO))
-		return -EIO;
+		return -EIO; */
 
 	/* Configure LCDC CS GPIO pin */
 	if (gpio_request(LCD_CS_GPIO, "LCDC CS"))
