@@ -387,7 +387,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
 {
 	u32 reg;
 	int ret = 0;
-	unsigned long timeout = jiffies + msecs_to_jiffies(20);
+	unsigned long timeout = jiffies + msecs_to_jiffies(20000);
 
 	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
 
@@ -404,6 +404,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
 		 * in the PLL register is valid and can be enabled here.
 		 * Otherwise, it needs to be enabled as part of setrate.
 		 */
+	        
 
 		/*
 		 * Gate clock into PLL
